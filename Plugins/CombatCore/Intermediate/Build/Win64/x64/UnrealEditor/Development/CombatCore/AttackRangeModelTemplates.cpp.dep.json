@@ -1,0 +1,19 @@
+{
+    "Version": "1.2",
+    "Data": {
+        "Source": "d:\\unreallibrary\\caddysmash 5.7\\plugins\\combatcore\\source\\combatcore\\private\\combat\\attackrangemodeltemplates.cpp",
+        "ProvidedModule": "",
+        "PCH": "d:\\unreallibrary\\caddysmash 5.7\\intermediate\\build\\win64\\x64\\caddysmasheditor\\development\\unrealed\\sharedpch.unrealed.project.valapi.valexpapi.cpp20.inclorderunreal5_4.h.pch",
+        "Includes": [
+            "d:\\unreallibrary\\caddysmash 5.7\\plugins\\combatcore\\intermediate\\build\\win64\\x64\\unrealeditor\\development\\combatcore\\definitions.combatcore.h",
+            "d:\\unreallibrary\\caddysmash 5.7\\plugins\\combatcore\\source\\combatcore\\public\\combat\\attackrangemodeltemplates.h",
+            "d:\\unreallibrary\\caddysmash 5.7\\plugins\\combatcore\\source\\combatcore\\public\\combat\\attackrangemodel.h",
+            "d:\\unreallibrary\\caddysmash 5.7\\plugins\\combatcore\\source\\combatcore\\public\\combat\\attacktypes.h",
+            "d:\\unreallibrary\\caddysmash 5.7\\plugins\\combatcore\\intermediate\\build\\win64\\unrealeditor\\inc\\combatcore\\uht\\attacktypes.generated.h",
+            "d:\\unreallibrary\\caddysmash 5.7\\plugins\\combatcore\\intermediate\\build\\win64\\unrealeditor\\inc\\combatcore\\uht\\attackrangemodel.generated.h",
+            "d:\\unreallibrary\\caddysmash 5.7\\plugins\\combatcore\\intermediate\\build\\win64\\unrealeditor\\inc\\combatcore\\uht\\attackrangemodeltemplates.generated.h"
+        ],
+        "ImportedModules": [],
+        "ImportedHeaderUnits": []
+    }
+}

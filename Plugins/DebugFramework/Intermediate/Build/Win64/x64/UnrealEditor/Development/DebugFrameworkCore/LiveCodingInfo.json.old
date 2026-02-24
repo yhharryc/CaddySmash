@@ -1,0 +1,19 @@
+{
+	"RemapUnityFiles": 
+	{
+		"Module.DebugFrameworkCore.cpp.obj": [
+			"DebugFrameworkCore.init.gen.cpp.obj",
+			"DebugFrameworkProvider.gen.cpp.obj",
+			"DebugFrameworkSettings.gen.cpp.obj",
+			"DebugFrameworkSubsystem.gen.cpp.obj",
+			"DebugFrameworkTypes.gen.cpp.obj",
+			"DebugFrameworkUserSettings.gen.cpp.obj",
+			"PerModuleInline.gen.cpp.obj",
+			"DebugFrameworkCoreModule.cpp.obj",
+			"DebugFrameworkLog.cpp.obj",
+			"DebugFrameworkSubsystem.cpp.obj",
+			"DebugFrameworkUserSettings.cpp.obj",
+			"DebugFrameworkSettings.cpp.obj"
+		]
+	}
+}

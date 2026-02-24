@@ -1,0 +1,27 @@
+{
+	"RemapUnityFiles": 
+	{
+		"Module.SquadCore.cpp.obj": [
+			"CompliancePolicy.gen.cpp.obj",
+			"FormationAsset.gen.cpp.obj",
+			"LootEvaluator.gen.cpp.obj",
+			"PressureComponent.gen.cpp.obj",
+			"SquadCore.init.gen.cpp.obj",
+			"SquadManagerSubsystem.gen.cpp.obj",
+			"SquadMemberComponent.gen.cpp.obj",
+			"SquadSlotAssignmentPolicy.gen.cpp.obj",
+			"SquadTypes.gen.cpp.obj",
+			"ThreatEvaluator.gen.cpp.obj",
+			"PerModuleInline.gen.cpp.obj",
+			"CompliancePolicy.cpp.obj",
+			"FormationAsset.cpp.obj",
+			"LootEvaluator.cpp.obj",
+			"PressureComponent.cpp.obj",
+			"SquadCoreModule.cpp.obj",
+			"SquadManagerSubsystem.cpp.obj",
+			"SquadMemberComponent.cpp.obj",
+			"SquadSlotAssignmentPolicy.cpp.obj",
+			"ThreatEvaluator.cpp.obj"
+		]
+	}
+}

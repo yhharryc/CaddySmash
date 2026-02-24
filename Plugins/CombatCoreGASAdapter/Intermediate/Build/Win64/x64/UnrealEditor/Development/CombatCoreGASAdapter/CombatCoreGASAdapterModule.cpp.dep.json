@@ -1,0 +1,14 @@
+{
+    "Version": "1.2",
+    "Data": {
+        "Source": "d:\\unreallibrary\\caddysmash 5.7\\plugins\\combatcoregasadapter\\source\\combatcoregasadapter\\private\\combatcoregasadaptermodule.cpp",
+        "ProvidedModule": "",
+        "PCH": "d:\\unreallibrary\\caddysmash 5.7\\intermediate\\build\\win64\\x64\\caddysmasheditor\\development\\unrealed\\sharedpch.unrealed.project.valapi.valexpapi.cpp20.inclorderunreal5_4.h.pch",
+        "Includes": [
+            "d:\\unreallibrary\\caddysmash 5.7\\plugins\\combatcoregasadapter\\intermediate\\build\\win64\\x64\\unrealeditor\\development\\combatcoregasadapter\\definitions.combatcoregasadapter.h",
+            "d:\\unreallibrary\\caddysmash 5.7\\plugins\\combatcoregasadapter\\source\\combatcoregasadapter\\public\\combatcoregasadaptermodule.h"
+        ],
+        "ImportedModules": [],
+        "ImportedHeaderUnits": []
+    }
+}

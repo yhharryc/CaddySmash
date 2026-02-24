@@ -1,0 +1,22 @@
+﻿{
+  "FileVersion": 3,
+  "Version": 1,
+  "VersionName": "0.1.0",
+  "FriendlyName": "Debug Framework",
+  "Description": "Reusable runtime debug framework with pluggable data providers and draggable panels.",
+  "Category": "Debug",
+  "CanContainContent": true,
+  "IsBetaVersion": true,
+  "Modules": [
+    {
+      "Name": "DebugFrameworkCore",
+      "Type": "Runtime",
+      "LoadingPhase": "Default"
+    },
+    {
+      "Name": "DebugFrameworkUI",
+      "Type": "Runtime",
+      "LoadingPhase": "Default"
+    }
+  ]
+}

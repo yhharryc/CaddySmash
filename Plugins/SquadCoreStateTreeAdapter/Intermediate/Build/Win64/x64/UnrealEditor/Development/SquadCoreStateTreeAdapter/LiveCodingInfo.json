@@ -1,0 +1,15 @@
+{
+	"RemapUnityFiles": 
+	{
+		"Module.SquadCoreStateTreeAdapter.cpp.obj": [
+			"SquadCoreStateTreeAdapter.init.gen.cpp.obj",
+			"SquadStateTreeConditions.gen.cpp.obj",
+			"SquadStateTreeTasks.gen.cpp.obj",
+			"PerModuleInline.gen.cpp.obj",
+			"SquadCoreStateTreeAdapterModule.cpp.obj",
+			"SquadStateTreeConditions.cpp.obj",
+			"SquadStateTreeLog.cpp.obj",
+			"SquadStateTreeTasks.cpp.obj"
+		]
+	}
+}

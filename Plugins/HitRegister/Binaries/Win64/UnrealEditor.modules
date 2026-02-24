@@ -1,0 +1,9 @@
+{
+	"BuildId": "47537391",
+	"Modules": 
+	{
+		"HitRegisterCollision": "UnrealEditor-HitRegisterCollision.dll",
+		"HitRegisterCore": "UnrealEditor-HitRegisterCore.dll",
+		"HitRegisterGASAdapter": "UnrealEditor-HitRegisterGASAdapter.dll"
+	}
+}

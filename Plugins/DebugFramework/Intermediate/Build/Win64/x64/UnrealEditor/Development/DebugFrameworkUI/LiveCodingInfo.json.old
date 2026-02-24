@@ -1,0 +1,22 @@
+{
+	"RemapUnityFiles": 
+	{
+		"Module.DebugFrameworkUI.cpp.obj": [
+			"DebugFrameworkControlMenuWidget.gen.cpp.obj",
+			"DebugFrameworkMenuRowWidget.gen.cpp.obj",
+			"DebugFrameworkOverlayWidget.gen.cpp.obj",
+			"DebugFrameworkPanelWidget.gen.cpp.obj",
+			"DebugFrameworkToolPanelWidget.gen.cpp.obj",
+			"DebugFrameworkUI.init.gen.cpp.obj",
+			"DebugFrameworkUISubsystem.gen.cpp.obj",
+			"PerModuleInline.gen.cpp.obj",
+			"DebugFrameworkOverlayWidget.cpp.obj",
+			"DebugFrameworkPanelWidget.cpp.obj",
+			"DebugFrameworkUIModule.cpp.obj",
+			"DebugFrameworkControlMenuWidget.cpp.obj",
+			"DebugFrameworkMenuRowWidget.cpp.obj",
+			"DebugFrameworkToolPanelWidget.cpp.obj",
+			"DebugFrameworkUISubsystem.cpp.obj"
+		]
+	}
+}

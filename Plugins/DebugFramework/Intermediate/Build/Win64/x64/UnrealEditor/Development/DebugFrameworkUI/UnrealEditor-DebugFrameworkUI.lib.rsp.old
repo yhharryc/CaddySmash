@@ -1,0 +1,12 @@
+/NOLOGO
+/errorReport:prompt
+/MACHINE:x64
+/SUBSYSTEM:WINDOWS
+/DEF
+/NAME:"UnrealEditor-DebugFrameworkUI.dll"
+/IGNORE:4221
+/NODEFAULTLIB
+"D:/UnrealLibrary/GroupSurvivor/Intermediate/Build/Win64/x64/GroupSurvivorEditor/Development/UnrealEd/SharedPCH.UnrealEd.Project.ValApi.ValExpApi.Cpp20.InclOrderUnreal5_4.h.obj"
+"D:/UnrealLibrary/GroupSurvivor/Plugins/DebugFramework/Intermediate/Build/Win64/x64/UnrealEditor/Development/DebugFrameworkUI/Module.DebugFrameworkUI.cpp.obj"
+"D:/UnrealLibrary/GroupSurvivor/Plugins/DebugFramework/Intermediate/Build/Win64/x64/UnrealEditor/Development/DebugFrameworkUI/Default.rc2.res"
+/OUT:"D:/UnrealLibrary/GroupSurvivor/Plugins/DebugFramework/Intermediate/Build/Win64/x64/UnrealEditor/Development/DebugFrameworkUI/UnrealEditor-DebugFrameworkUI.lib"

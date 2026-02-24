@@ -1,0 +1,16 @@
+{
+    "Version": "1.2",
+    "Data": {
+        "Source": "d:\\unreallibrary\\caddysmash 5.7\\plugins\\hitregister\\source\\hitregistercollision\\private\\hitregistercollision\\hitregisterteamutils.cpp",
+        "ProvidedModule": "",
+        "PCH": "d:\\unreallibrary\\caddysmash 5.7\\intermediate\\build\\win64\\x64\\caddysmasheditor\\development\\unrealed\\sharedpch.unrealed.project.valapi.valexpapi.cpp20.inclorderunreal5_4.h.pch",
+        "Includes": [
+            "d:\\unreallibrary\\caddysmash 5.7\\plugins\\hitregister\\intermediate\\build\\win64\\x64\\unrealeditor\\development\\hitregistercollision\\definitions.hitregistercollision.h",
+            "d:\\unreallibrary\\caddysmash 5.7\\plugins\\hitregister\\source\\hitregistercollision\\private\\hitregistercollision\\hitregisterteamutils.h",
+            "d:\\unreallibrary\\caddysmash 5.7\\plugins\\hitregister\\source\\hitregistercollision\\public\\hitregistercollision\\hitregisterteaminterface.h",
+            "d:\\unreallibrary\\caddysmash 5.7\\plugins\\hitregister\\intermediate\\build\\win64\\unrealeditor\\inc\\hitregistercollision\\uht\\hitregisterteaminterface.generated.h"
+        ],
+        "ImportedModules": [],
+        "ImportedHeaderUnits": []
+    }
+}

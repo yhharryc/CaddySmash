@@ -1,0 +1,14 @@
+{
+    "Version": "1.2",
+    "Data": {
+        "Source": "d:\\unreallibrary\\caddysmash 5.7\\plugins\\debugframework\\source\\debugframeworkui\\private\\debugframeworkui\\debugframeworkuimodule.cpp",
+        "ProvidedModule": "",
+        "PCH": "d:\\unreallibrary\\caddysmash 5.7\\intermediate\\build\\win64\\x64\\caddysmasheditor\\development\\unrealed\\sharedpch.unrealed.project.valapi.valexpapi.cpp20.inclorderunreal5_4.h.pch",
+        "Includes": [
+            "d:\\unreallibrary\\caddysmash 5.7\\plugins\\debugframework\\intermediate\\build\\win64\\x64\\unrealeditor\\development\\debugframeworkui\\definitions.debugframeworkui.h",
+            "d:\\unreallibrary\\caddysmash 5.7\\plugins\\debugframework\\source\\debugframeworkui\\public\\debugframeworkui\\debugframeworkuimodule.h"
+        ],
+        "ImportedModules": [],
+        "ImportedHeaderUnits": []
+    }
+}

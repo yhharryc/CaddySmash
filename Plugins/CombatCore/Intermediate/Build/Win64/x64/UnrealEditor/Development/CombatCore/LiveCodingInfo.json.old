@@ -1,0 +1,26 @@
+{
+	"RemapUnityFiles": 
+	{
+		"Module.CombatCore.cpp.obj": [
+			"AttackAbility.gen.cpp.obj",
+			"AttackOrchestratorComponent.gen.cpp.obj",
+			"AttackProfile.gen.cpp.obj",
+			"AttackRangeModel.gen.cpp.obj",
+			"AttackRangeModelTemplates.gen.cpp.obj",
+			"AttackTypes.gen.cpp.obj",
+			"CombatAttackAdapter.gen.cpp.obj",
+			"CombatCore.init.gen.cpp.obj",
+			"CombatWeaponActor.gen.cpp.obj",
+			"WeaponExecutor.gen.cpp.obj",
+			"WeaponHitscanComponent.gen.cpp.obj",
+			"PerModuleInline.gen.cpp.obj",
+			"CombatCoreModule.cpp.obj",
+			"AttackAbility.cpp.obj",
+			"AttackRangeModel.cpp.obj",
+			"AttackRangeModelTemplates.cpp.obj",
+			"CombatWeaponActor.cpp.obj",
+			"WeaponHitscanComponent.cpp.obj",
+			"AttackOrchestratorComponent.cpp.obj"
+		]
+	}
+}

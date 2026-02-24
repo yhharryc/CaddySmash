@@ -1,0 +1,41 @@
+{
+    "Version": "1.2",
+    "Data": {
+        "Source": "d:\\unreallibrary\\groupsurvivor\\plugins\\hitregister\\source\\hitregistercollision\\private\\hitregistercollision\\hitregistercollisionsubsystem.cpp",
+        "ProvidedModule": "",
+        "PCH": "d:\\unreallibrary\\groupsurvivor\\intermediate\\build\\win64\\x64\\groupsurvivoreditor\\development\\unrealed\\sharedpch.unrealed.project.valapi.valexpapi.cpp20.inclorderunreal5_4.h.pch",
+        "Includes": [
+            "d:\\unreallibrary\\groupsurvivor\\plugins\\hitregister\\intermediate\\build\\win64\\x64\\unrealeditor\\development\\hitregistercollision\\definitions.hitregistercollision.h",
+            "d:\\unreallibrary\\groupsurvivor\\plugins\\hitregister\\source\\hitregistercollision\\public\\hitregistercollision\\hitregistercollisionsubsystem.h",
+            "d:\\unreallibrary\\groupsurvivor\\plugins\\hitregister\\source\\hitregistercore\\public\\hitregister\\hitregistertypes.h",
+            "d:\\ue_5.7\\engine\\source\\runtime\\gameplaytags\\classes\\gameplaytagcontainer.h",
+            "d:\\ue_5.7\\engine\\source\\runtime\\core\\public\\misc\\comparisonutility.h",
+            "d:\\ue_5.7\\engine\\intermediate\\build\\win64\\unrealeditor\\inc\\gameplaytags\\uht\\gameplaytagcontainer.generated.h",
+            "d:\\unreallibrary\\groupsurvivor\\plugins\\hitregister\\intermediate\\build\\win64\\unrealeditor\\inc\\hitregistercore\\uht\\hitregistertypes.generated.h",
+            "d:\\unreallibrary\\groupsurvivor\\plugins\\hitregister\\source\\hitregistercollision\\public\\hitregistercollision\\hitregistercollisiontypes.h",
+            "d:\\unreallibrary\\groupsurvivor\\plugins\\hitregister\\intermediate\\build\\win64\\unrealeditor\\inc\\hitregistercollision\\uht\\hitregistercollisiontypes.generated.h",
+            "d:\\unreallibrary\\groupsurvivor\\plugins\\hitregister\\intermediate\\build\\win64\\unrealeditor\\inc\\hitregistercollision\\uht\\hitregistercollisionsubsystem.generated.h",
+            "d:\\unreallibrary\\groupsurvivor\\plugins\\hitregister\\source\\hitregistercollision\\public\\hitregistercollision\\hitregistercollisionsettings.h",
+            "d:\\unreallibrary\\groupsurvivor\\plugins\\hitregister\\intermediate\\build\\win64\\unrealeditor\\inc\\hitregistercollision\\uht\\hitregistercollisionsettings.generated.h",
+            "d:\\unreallibrary\\groupsurvivor\\plugins\\hitregister\\source\\hitregistercollision\\public\\hitregistercollision\\hitregisterhurtboxcomponent.h",
+            "d:\\ue_5.7\\engine\\source\\runtime\\engine\\classes\\components\\boxcomponent.h",
+            "d:\\ue_5.7\\engine\\source\\runtime\\engine\\classes\\components\\shapecomponent.h",
+            "d:\\ue_5.7\\engine\\intermediate\\build\\win64\\unrealeditor\\inc\\engine\\uht\\shapecomponent.generated.h",
+            "d:\\ue_5.7\\engine\\intermediate\\build\\win64\\unrealeditor\\inc\\engine\\uht\\boxcomponent.generated.h",
+            "d:\\unreallibrary\\groupsurvivor\\plugins\\hitregister\\intermediate\\build\\win64\\unrealeditor\\inc\\hitregistercollision\\uht\\hitregisterhurtboxcomponent.generated.h",
+            "d:\\unreallibrary\\groupsurvivor\\plugins\\hitregister\\source\\hitregistercollision\\public\\hitregistercollision\\hitregisterrelationresolver.h",
+            "d:\\unreallibrary\\groupsurvivor\\plugins\\hitregister\\intermediate\\build\\win64\\unrealeditor\\inc\\hitregistercollision\\uht\\hitregisterrelationresolver.generated.h",
+            "d:\\unreallibrary\\groupsurvivor\\plugins\\hitregister\\source\\hitregistercollision\\public\\hitregistercollision\\hitregistertargetingprofile.h",
+            "d:\\unreallibrary\\groupsurvivor\\plugins\\hitregister\\intermediate\\build\\win64\\unrealeditor\\inc\\hitregistercollision\\uht\\hitregistertargetingprofile.generated.h",
+            "d:\\unreallibrary\\groupsurvivor\\plugins\\hitregister\\source\\hitregistercollision\\private\\hitregistercollision\\hitregisterteamutils.h",
+            "d:\\unreallibrary\\groupsurvivor\\plugins\\hitregister\\source\\hitregistercore\\public\\hitregister\\hitregistersubsystem.h",
+            "d:\\unreallibrary\\groupsurvivor\\plugins\\hitregister\\source\\hitregistercore\\public\\hitregister\\hitregisterpipeline.h",
+            "d:\\unreallibrary\\groupsurvivor\\plugins\\hitregister\\source\\hitregistercore\\public\\hitregister\\hitregisternode.h",
+            "d:\\unreallibrary\\groupsurvivor\\plugins\\hitregister\\intermediate\\build\\win64\\unrealeditor\\inc\\hitregistercore\\uht\\hitregisternode.generated.h",
+            "d:\\unreallibrary\\groupsurvivor\\plugins\\hitregister\\intermediate\\build\\win64\\unrealeditor\\inc\\hitregistercore\\uht\\hitregisterpipeline.generated.h",
+            "d:\\unreallibrary\\groupsurvivor\\plugins\\hitregister\\intermediate\\build\\win64\\unrealeditor\\inc\\hitregistercore\\uht\\hitregistersubsystem.generated.h"
+        ],
+        "ImportedModules": [],
+        "ImportedHeaderUnits": []
+    }
+}

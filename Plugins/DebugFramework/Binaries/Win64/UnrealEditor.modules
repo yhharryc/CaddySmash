@@ -1,0 +1,8 @@
+{
+	"BuildId": "47537391",
+	"Modules": 
+	{
+		"DebugFrameworkCore": "UnrealEditor-DebugFrameworkCore.dll",
+		"DebugFrameworkUI": "UnrealEditor-DebugFrameworkUI.dll"
+	}
+}

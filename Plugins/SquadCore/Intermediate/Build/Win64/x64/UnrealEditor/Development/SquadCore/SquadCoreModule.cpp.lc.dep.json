@@ -1,0 +1,14 @@
+{
+    "Version": "1.2",
+    "Data": {
+        "Source": "d:\\unreallibrary\\groupsurvivor\\plugins\\squadcore\\source\\squadcore\\private\\squadcore\\squadcoremodule.cpp",
+        "ProvidedModule": "",
+        "PCH": "d:\\unreallibrary\\groupsurvivor\\intermediate\\build\\win64\\x64\\groupsurvivoreditor\\development\\unrealed\\sharedpch.unrealed.project.valapi.valexpapi.cpp20.inclorderunreal5_4.h.pch",
+        "Includes": [
+            "d:\\unreallibrary\\groupsurvivor\\plugins\\squadcore\\intermediate\\build\\win64\\x64\\unrealeditor\\development\\squadcore\\definitions.squadcore.h",
+            "d:\\unreallibrary\\groupsurvivor\\plugins\\squadcore\\source\\squadcore\\public\\squadcore\\squadcoremodule.h"
+        ],
+        "ImportedModules": [],
+        "ImportedHeaderUnits": []
+    }
+}

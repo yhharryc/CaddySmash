@@ -1,0 +1,24 @@
+{
+    "Version": "1.2",
+    "Data": {
+        "Source": "d:\\unreallibrary\\groupsurvivor\\plugins\\debugframework\\source\\debugframeworkcore\\private\\debugframework\\debugframeworksubsystem.cpp",
+        "ProvidedModule": "",
+        "PCH": "d:\\unreallibrary\\groupsurvivor\\intermediate\\build\\win64\\x64\\groupsurvivoreditor\\development\\unrealed\\sharedpch.unrealed.project.valapi.valexpapi.cpp20.inclorderunreal5_4.h.pch",
+        "Includes": [
+            "d:\\unreallibrary\\groupsurvivor\\plugins\\debugframework\\intermediate\\build\\win64\\x64\\unrealeditor\\development\\debugframeworkcore\\definitions.debugframeworkcore.h",
+            "d:\\unreallibrary\\groupsurvivor\\plugins\\debugframework\\source\\debugframeworkcore\\public\\debugframework\\debugframeworksubsystem.h",
+            "d:\\unreallibrary\\groupsurvivor\\plugins\\debugframework\\source\\debugframeworkcore\\public\\debugframework\\debugframeworksettings.h",
+            "d:\\unreallibrary\\groupsurvivor\\plugins\\debugframework\\intermediate\\build\\win64\\unrealeditor\\inc\\debugframeworkcore\\uht\\debugframeworksettings.generated.h",
+            "d:\\unreallibrary\\groupsurvivor\\plugins\\debugframework\\source\\debugframeworkcore\\public\\debugframework\\debugframeworktypes.h",
+            "d:\\unreallibrary\\groupsurvivor\\plugins\\debugframework\\intermediate\\build\\win64\\unrealeditor\\inc\\debugframeworkcore\\uht\\debugframeworktypes.generated.h",
+            "d:\\unreallibrary\\groupsurvivor\\plugins\\debugframework\\intermediate\\build\\win64\\unrealeditor\\inc\\debugframeworkcore\\uht\\debugframeworksubsystem.generated.h",
+            "d:\\unreallibrary\\groupsurvivor\\plugins\\debugframework\\source\\debugframeworkcore\\public\\debugframework\\debugframeworklog.h",
+            "d:\\unreallibrary\\groupsurvivor\\plugins\\debugframework\\source\\debugframeworkcore\\public\\debugframework\\debugframeworkprovider.h",
+            "d:\\unreallibrary\\groupsurvivor\\plugins\\debugframework\\intermediate\\build\\win64\\unrealeditor\\inc\\debugframeworkcore\\uht\\debugframeworkprovider.generated.h",
+            "d:\\unreallibrary\\groupsurvivor\\plugins\\debugframework\\source\\debugframeworkcore\\public\\debugframework\\debugframeworkusersettings.h",
+            "d:\\unreallibrary\\groupsurvivor\\plugins\\debugframework\\intermediate\\build\\win64\\unrealeditor\\inc\\debugframeworkcore\\uht\\debugframeworkusersettings.generated.h"
+        ],
+        "ImportedModules": [],
+        "ImportedHeaderUnits": []
+    }
+}

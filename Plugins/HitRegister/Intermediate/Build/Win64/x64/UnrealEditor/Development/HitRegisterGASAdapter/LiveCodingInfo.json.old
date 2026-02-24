@@ -1,0 +1,12 @@
+{
+	"RemapUnityFiles": 
+	{
+		"Module.HitRegisterGASAdapter.cpp.obj": [
+			"HitRegisterGASAdapter.init.gen.cpp.obj",
+			"HRGASDamageApplierComponent.gen.cpp.obj",
+			"PerModuleInline.gen.cpp.obj",
+			"HitRegisterGASAdapterModule.cpp.obj",
+			"HRGASDamageApplierComponent.cpp.obj"
+		]
+	}
+}

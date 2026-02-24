@@ -1,0 +1,16 @@
+{
+	"RemapUnityFiles": 
+	{
+		"Module.SquadCoreDebugAdapter.cpp.obj": [
+			"SquadCoreDebugAdapter.init.gen.cpp.obj",
+			"SquadDebugComponent.gen.cpp.obj",
+			"SquadDebugHUD.gen.cpp.obj",
+			"SquadDebugWidget.gen.cpp.obj",
+			"PerModuleInline.gen.cpp.obj",
+			"SquadCoreDebugAdapterModule.cpp.obj",
+			"SquadDebugComponent.cpp.obj",
+			"SquadDebugHUD.cpp.obj",
+			"SquadDebugWidget.cpp.obj"
+		]
+	}
+}

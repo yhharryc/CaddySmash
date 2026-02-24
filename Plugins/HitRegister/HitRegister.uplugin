@@ -1,0 +1,23 @@
+{
+  "FileVersion": 3,
+  "Version": 1,
+  "VersionName": "0.1.0",
+  "FriendlyName": "Hit Register",
+  "Description": "Decoupled hit registration pipeline with optional GAS adapter.",
+  "Category": "Gameplay",
+  "CreatedBy": "ChatGPT",
+  "CanContainContent": true,
+  "IsBetaVersion": true,
+  "Modules": [
+    {
+      "Name": "HitRegisterCore",
+      "Type": "Runtime",
+      "LoadingPhase": "Default"
+    },
+    {
+      "Name": "HitRegisterCollision",
+      "Type": "Runtime",
+      "LoadingPhase": "Default"
+    }
+  ]
+}

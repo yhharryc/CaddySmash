@@ -1,0 +1,14 @@
+{
+    "Version": "1.2",
+    "Data": {
+        "Source": "d:\\unreallibrary\\caddysmash 5.7\\plugins\\squadcorestatetreeadapter\\source\\squadcorestatetreeadapter\\private\\squadcorestatetreeadaptermodule.cpp",
+        "ProvidedModule": "",
+        "PCH": "d:\\unreallibrary\\caddysmash 5.7\\intermediate\\build\\win64\\x64\\caddysmasheditor\\development\\unrealed\\sharedpch.unrealed.project.valapi.valexpapi.cpp20.inclorderunreal5_4.h.pch",
+        "Includes": [
+            "d:\\unreallibrary\\caddysmash 5.7\\plugins\\squadcorestatetreeadapter\\intermediate\\build\\win64\\x64\\unrealeditor\\development\\squadcorestatetreeadapter\\definitions.squadcorestatetreeadapter.h",
+            "d:\\unreallibrary\\caddysmash 5.7\\plugins\\squadcorestatetreeadapter\\source\\squadcorestatetreeadapter\\public\\squadcorestatetreeadaptermodule.h"
+        ],
+        "ImportedModules": [],
+        "ImportedHeaderUnits": []
+    }
+}

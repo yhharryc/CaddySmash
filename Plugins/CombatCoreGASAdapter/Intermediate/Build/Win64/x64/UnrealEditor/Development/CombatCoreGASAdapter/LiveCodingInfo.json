@@ -1,0 +1,15 @@
+{
+	"RemapUnityFiles": 
+	{
+		"Module.CombatCoreGASAdapter.cpp.obj": [
+			"AttackAbility.gen.cpp.obj",
+			"CombatCoreGASAdapter.init.gen.cpp.obj",
+			"CombatGASAttackAdapterComponent.gen.cpp.obj",
+			"PerModuleInline.gen.cpp.obj",
+			"CombatCoreGASAdapterModule.cpp.obj",
+			"AttackAbility.cpp.obj",
+			"CombatCoreGASAdapterLog.cpp.obj",
+			"CombatGASAttackAdapterComponent.cpp.obj"
+		]
+	}
+}
