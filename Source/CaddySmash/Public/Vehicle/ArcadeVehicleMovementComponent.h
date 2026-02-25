@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "GameplayTagContainer.h"
 #include "GameFramework/PawnMovementComponent.h"
 #include "ArcadeVehicleMovementComponent.generated.h"
 
@@ -49,9 +50,6 @@ struct FCaddyVehicleHandlingConfig
     float StopSpeedThreshold = 8.0f;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Handling", meta=(ClampMin="0.0", ClampMax="1.0"))
-    float CollisionSpeedRetainRatio = 0.35f;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Handling", meta=(ClampMin="0.0", ClampMax="1.0"))
     float MoveIntentDeadZone = 0.12f;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Handling|Drift", meta=(ClampMin="0.0"))
@@ -64,7 +62,102 @@ struct FCaddyVehicleHandlingConfig
     float DriftInputThreshold = 0.15f;
 };
 
+UENUM(BlueprintType)
+enum class ECaddyVehicleCollisionResponseMode : uint8
+{
+    SlideOnly,
+    ArcadeWallGlide
+};
+
+USTRUCT(BlueprintType)
+struct FCaddyVehicleCollisionHitRegisterConfig
+{
+    GENERATED_BODY()
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Collision|HitRegister")
+    bool bEnableCollisionHitRegister = true;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Collision|HitRegister", meta=(ClampMin="0.0"))
+    float MinSpeedForEvent = 550.0f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Collision|HitRegister", meta=(ClampMin="0.0"))
+    float MinNormalImpactSpeedForEvent = 180.0f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Collision|HitRegister", meta=(ClampMin="0.0"))
+    float EventCooldownSeconds = 0.2f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Collision|HitRegister", meta=(ClampMin="0.0"))
+    float BaseDamageByNormalImpactSpeed = 0.012f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Collision|HitRegister", meta=(ClampMin="0.0"))
+    float BaseDamageBias = 0.0f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Collision|HitRegister")
+    FGameplayTagContainer BaseTags;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Collision|HitRegister")
+    FGameplayTag WorldStaticTag;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Collision|HitRegister")
+    FGameplayTag WorldDynamicTag;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Collision|HitRegister")
+    FGameplayTag PawnTag;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Collision|HitRegister")
+    FGameplayTag DriftingTag;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Collision|HitRegister")
+    FGameplayTag SpeedAttributeTag;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Collision|HitRegister")
+    FGameplayTag NormalImpactSpeedAttributeTag;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Collision|HitRegister")
+    FGameplayTag DriftingAttributeTag;
+};
+
+USTRUCT(BlueprintType)
+struct FCaddyVehicleCollisionConfig
+{
+    GENERATED_BODY()
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Collision")
+    ECaddyVehicleCollisionResponseMode ResponseMode = ECaddyVehicleCollisionResponseMode::ArcadeWallGlide;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Collision", meta=(ClampMin="0.0", ClampMax="1.0"))
+    float SpeedRetainRatio = 0.62f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Collision", meta=(ClampMin="1", ClampMax="4"))
+    int32 MaxCollisionIterations = 2;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Collision|Arcade", meta=(ClampMin="0.0"))
+    float WallGlideVelocityInterpSpeed = 14.0f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Collision|Arcade", meta=(ClampMin="0.0", ClampMax="1.0"))
+    float WallGlideInputAssist = 0.45f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Collision|Arcade", meta=(ClampMin="0.0"))
+    float MinNormalImpactSpeedForGlide = 140.0f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Collision|Arcade", meta=(ClampMin="0.0"))
+    float MinWallGlideSpeed = 260.0f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Collision|Arcade", meta=(ClampMin="0.0"))
+    float HeadOnGlideSpeedScale = 0.50f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Collision|Arcade", meta=(ClampMin="0.0"))
+    float PushOutDistance = 3.0f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Collision|Debug", meta=(ClampMin="0.0"))
+    float DebugPersistSeconds = 0.9f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Collision|HitRegister")
+    FCaddyVehicleCollisionHitRegisterConfig HitRegister;
+};
+
 class UCaddyVehicleTuningDataAsset;
+class UHitRegisterPipeline;
 
 UCLASS(ClassGroup=(Movement), meta=(BlueprintSpawnableComponent))
 class CADDYSMASH_API UArcadeVehicleMovementComponent : public UPawnMovementComponent
@@ -81,7 +174,13 @@ public:
     FCaddyVehicleHandlingConfig HandlingConfig;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Vehicle|Config")
+    FCaddyVehicleCollisionConfig CollisionConfig;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Vehicle|Config")
     TObjectPtr<UCaddyVehicleTuningDataAsset> TuningDataAsset = nullptr;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Vehicle|Config|Collision|HitRegister")
+    TObjectPtr<UHitRegisterPipeline> CollisionHitRegisterPipeline = nullptr;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Vehicle|Debug")
     bool bEnableDebugDraw = true;
@@ -152,6 +251,36 @@ public:
     UFUNCTION(BlueprintPure, Category="Vehicle|Telemetry")
     float GetTargetYawFromMoveIntent() const;
 
+    UFUNCTION(BlueprintPure, Category="Vehicle|Collision")
+    float GetTimeSinceLastBlockingHit() const;
+
+    UFUNCTION(BlueprintPure, Category="Vehicle|Collision")
+    bool DidLastCollisionTriggerHitRegister() const { return bLastCollisionTriggeredHitRegister; }
+
+    UFUNCTION(BlueprintPure, Category="Vehicle|Collision")
+    bool DidLastCollisionHitRegisterSucceed() const { return bLastCollisionHitRegisterSucceeded; }
+
+    UFUNCTION(BlueprintPure, Category="Vehicle|Collision")
+    float GetLastCollisionSpeed() const { return LastBlockingHitSpeed; }
+
+    UFUNCTION(BlueprintPure, Category="Vehicle|Collision")
+    float GetLastCollisionNormalImpactSpeed() const { return LastBlockingHitNormalSpeed; }
+
+    UFUNCTION(BlueprintPure, Category="Vehicle|Collision")
+    FVector GetLastCollisionLocation() const { return LastBlockingHitLocation; }
+
+    UFUNCTION(BlueprintPure, Category="Vehicle|Collision")
+    FVector GetLastCollisionNormal() const { return LastBlockingHitNormal; }
+
+    UFUNCTION(BlueprintPure, Category="Vehicle|Collision")
+    FVector GetLastCollisionTangent() const { return LastBlockingHitTangent; }
+
+    UFUNCTION(BlueprintPure, Category="Vehicle|Collision")
+    FString GetLastCollisionHitRegisterStatus() const { return LastCollisionHitRegisterStatus; }
+
+    UFUNCTION(BlueprintPure, Category="Vehicle|Collision")
+    FString GetLastCollisionActorName() const;
+
     virtual float GetMaxSpeed() const override;
     virtual void BeginPlay() override;
     virtual void TickComponent(float DeltaTime, enum ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
@@ -167,5 +296,34 @@ private:
     void UpdateSteering(float DeltaTime, float PlanarSpeedSqr);
     void UpdateVelocity(float DeltaTime);
     void PerformMovement(float DeltaTime);
+    void HandleBlockingCollision(
+        const FVector& PreImpactVelocity,
+        const FHitResult& Hit,
+        const FVector& AttemptedDelta,
+        float DeltaTime);
+    FVector ComputeArcadeWallGlideVelocity(
+        const FVector& PreImpactVelocity,
+        const FHitResult& Hit,
+        float DeltaTime,
+        float& OutNormalImpactSpeed,
+        FVector& OutTangentDirection) const;
+    void TryEmitCollisionHitRegisterEvent(const FHitResult& Hit, float TotalSpeed, float NormalImpactSpeed);
+    void CacheCollisionTelemetry(
+        const FHitResult& Hit,
+        float TotalSpeed,
+        float NormalImpactSpeed,
+        const FVector& TangentDirection);
     void DrawDebugVisuals() const;
+
+    float LastBlockingHitWorldTime = -1.0f;
+    float LastCollisionHitRegisterWorldTime = -1.0f;
+    float LastBlockingHitSpeed = 0.0f;
+    float LastBlockingHitNormalSpeed = 0.0f;
+    FVector LastBlockingHitLocation = FVector::ZeroVector;
+    FVector LastBlockingHitNormal = FVector::ZeroVector;
+    FVector LastBlockingHitTangent = FVector::ZeroVector;
+    TWeakObjectPtr<AActor> LastBlockingHitActor;
+    bool bLastCollisionTriggeredHitRegister = false;
+    bool bLastCollisionHitRegisterSucceeded = false;
+    FString LastCollisionHitRegisterStatus = TEXT("n/a");
 };

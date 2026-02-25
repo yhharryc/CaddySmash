@@ -21,7 +21,8 @@ public class CaddySmash : ModuleRules
 
 		PrivateDependencyModuleNames.AddRange(new string[]
 		{
-			"DebugFrameworkCore"
+			"DebugFrameworkCore",
+			"HitRegisterCore"
 		});
 
 		// Uncomment if you are using Slate UI

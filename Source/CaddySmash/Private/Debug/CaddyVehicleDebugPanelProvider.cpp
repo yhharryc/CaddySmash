@@ -1,5 +1,6 @@
 #include "Debug/CaddyVehicleDebugPanelProvider.h"
 
+#include "HitRegister/HitRegisterPipeline.h"
 #include "Vehicle/ArcadeVehicleMovementComponent.h"
 #include "Vehicle/CaddyVehiclePawn.h"
 #include "Vehicle/CaddyVehicleTuningDataAsset.h"
@@ -87,6 +88,9 @@ void UCaddyVehicleDebugPanelProvider::GatherDebugRows_Implementation(TArray<FDeb
         break;
     case ECaddyVehicleDebugPanelType::Tuning:
         GatherTuningRows(OutRows);
+        break;
+    case ECaddyVehicleDebugPanelType::Collision:
+        GatherCollisionRows(OutRows);
         break;
     case ECaddyVehicleDebugPanelType::DebugDraw:
         GatherDebugDrawRows(OutRows);
@@ -182,6 +186,56 @@ void UCaddyVehicleDebugPanelProvider::GatherTuningRows(TArray<FDebugFrameworkPan
     AddRow(OutRows, TEXT("DriftLateralFriction"), FString::Printf(TEXT("%.2f"), MovementComponent->HandlingConfig.DriftLateralFrictionInterpSpeed));
     AddRow(OutRows, TEXT("DriftSteeringMultiplier"), FString::Printf(TEXT("%.2f"), MovementComponent->HandlingConfig.DriftSteeringRateMultiplier));
     AddRow(OutRows, TEXT("LinearDrag"), FString::Printf(TEXT("%.2f"), MovementComponent->HandlingConfig.LinearDrag));
+    AddRow(OutRows, TEXT("CollisionMode"), StaticEnum<ECaddyVehicleCollisionResponseMode>()
+        ? StaticEnum<ECaddyVehicleCollisionResponseMode>()->GetNameStringByValue(static_cast<int64>(MovementComponent->CollisionConfig.ResponseMode))
+        : TEXT("Unknown"));
+    AddRow(OutRows, TEXT("CollisionRetainRatio"), FString::Printf(TEXT("%.2f"), MovementComponent->CollisionConfig.SpeedRetainRatio));
+    AddRow(OutRows, TEXT("CollisionIterations"), FString::Printf(TEXT("%d"), MovementComponent->CollisionConfig.MaxCollisionIterations));
+    AddRow(OutRows, TEXT("WallGlideInterp"), FString::Printf(TEXT("%.2f"), MovementComponent->CollisionConfig.WallGlideVelocityInterpSpeed));
+    AddRow(OutRows, TEXT("WallGlideAssist"), FString::Printf(TEXT("%.2f"), MovementComponent->CollisionConfig.WallGlideInputAssist));
+    AddRow(OutRows, TEXT("WallGlideMinNormal"), FString::Printf(TEXT("%.1f"), MovementComponent->CollisionConfig.MinNormalImpactSpeedForGlide));
+    AddRow(OutRows, TEXT("WallGlideMinSpeed"), FString::Printf(TEXT("%.1f"), MovementComponent->CollisionConfig.MinWallGlideSpeed));
+    AddRow(OutRows, TEXT("PushOutDistance"), FString::Printf(TEXT("%.1f"), MovementComponent->CollisionConfig.PushOutDistance));
+}
+
+void UCaddyVehicleDebugPanelProvider::GatherCollisionRows(TArray<FDebugFrameworkPanelRow>& OutRows) const
+{
+    const ACaddyVehiclePawn* Pawn = VehiclePawn.Get();
+    const UArcadeVehicleMovementComponent* MovementComponent = Pawn ? Pawn->GetVehicleMovementComponent() : nullptr;
+    if (!Pawn || !MovementComponent)
+    {
+        AddRow(OutRows, TEXT("Status"), TEXT("Vehicle or movement missing"), FLinearColor::Red);
+        return;
+    }
+
+    const float TimeSinceHit = MovementComponent->GetTimeSinceLastBlockingHit();
+    AddRow(OutRows, TEXT("LastHitAge"), TimeSinceHit >= 0.0f ? FString::Printf(TEXT("%.3fs"), TimeSinceHit) : TEXT("n/a"));
+    AddRow(OutRows, TEXT("LastHitActor"), MovementComponent->GetLastCollisionActorName());
+    AddRow(OutRows, TEXT("LastHitSpeed"), FString::Printf(TEXT("%.1f"), MovementComponent->GetLastCollisionSpeed()));
+    AddRow(OutRows, TEXT("LastNormalImpact"), FString::Printf(TEXT("%.1f"), MovementComponent->GetLastCollisionNormalImpactSpeed()));
+
+    const FVector HitLocation = MovementComponent->GetLastCollisionLocation();
+    const FVector HitNormal = MovementComponent->GetLastCollisionNormal();
+    const FVector HitTangent = MovementComponent->GetLastCollisionTangent();
+    AddRow(OutRows, TEXT("HitLocation"), FString::Printf(TEXT("(%.1f, %.1f, %.1f)"), HitLocation.X, HitLocation.Y, HitLocation.Z));
+    AddRow(OutRows, TEXT("HitNormal"), FString::Printf(TEXT("(%.2f, %.2f, %.2f)"), HitNormal.X, HitNormal.Y, HitNormal.Z));
+    AddRow(OutRows, TEXT("HitTangent"), FString::Printf(TEXT("(%.2f, %.2f, %.2f)"), HitTangent.X, HitTangent.Y, HitTangent.Z));
+
+    AddRow(OutRows, TEXT("HitRegisterEnabled"), BoolToOnOff(MovementComponent->CollisionConfig.HitRegister.bEnableCollisionHitRegister));
+    const UHitRegisterPipeline* HitRegisterPipeline = MovementComponent->CollisionHitRegisterPipeline.Get();
+    AddRow(OutRows, TEXT("HR Pipeline"), HitRegisterPipeline ? HitRegisterPipeline->GetName() : TEXT("None"));
+    AddRow(OutRows, TEXT("HitRegisterTriggered"), BoolToOnOff(MovementComponent->DidLastCollisionTriggerHitRegister()));
+    AddRow(
+        OutRows,
+        TEXT("HitRegisterSuccess"),
+        BoolToOnOff(MovementComponent->DidLastCollisionHitRegisterSucceed()),
+        MovementComponent->DidLastCollisionHitRegisterSucceed() ? FLinearColor::Green : FLinearColor::Yellow);
+    AddRow(OutRows, TEXT("HitRegisterStatus"), MovementComponent->GetLastCollisionHitRegisterStatus());
+    AddRow(OutRows, TEXT("HR MinSpeed"), FString::Printf(TEXT("%.1f"), MovementComponent->CollisionConfig.HitRegister.MinSpeedForEvent));
+    AddRow(OutRows, TEXT("HR MinNormalSpeed"), FString::Printf(TEXT("%.1f"), MovementComponent->CollisionConfig.HitRegister.MinNormalImpactSpeedForEvent));
+    AddRow(OutRows, TEXT("HR Cooldown"), FString::Printf(TEXT("%.2f"), MovementComponent->CollisionConfig.HitRegister.EventCooldownSeconds));
+    AddRow(OutRows, TEXT("HR DamageScale"), FString::Printf(TEXT("%.4f"), MovementComponent->CollisionConfig.HitRegister.BaseDamageByNormalImpactSpeed));
+    AddRow(OutRows, TEXT("HR DamageBias"), FString::Printf(TEXT("%.2f"), MovementComponent->CollisionConfig.HitRegister.BaseDamageBias));
 }
 
 void UCaddyVehicleDebugPanelProvider::GatherDebugDrawRows(TArray<FDebugFrameworkPanelRow>& OutRows) const
@@ -200,4 +254,5 @@ void UCaddyVehicleDebugPanelProvider::GatherDebugDrawRows(TArray<FDebugFramework
     AddRow(OutRows, TEXT("VelocityLineScale"), FString::Printf(TEXT("%.3f"), MovementComponent->DebugVelocityLineScale));
     AddRow(OutRows, TEXT("DrawZOffset"), FString::Printf(TEXT("%.1f"), MovementComponent->DebugDrawZOffset));
     AddRow(OutRows, TEXT("LineThickness"), FString::Printf(TEXT("%.1f"), MovementComponent->DebugLineThickness));
+    AddRow(OutRows, TEXT("CollisionDebugPersist"), FString::Printf(TEXT("%.2f"), MovementComponent->CollisionConfig.DebugPersistSeconds));
 }

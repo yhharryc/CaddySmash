@@ -9,10 +9,12 @@
 ## Module Layout
 - `UArcadeVehicleMovementComponent`
   - Owns gas/handling configs.
+  - Owns dedicated collision config (`FCaddyVehicleCollisionConfig`) including smoothing and hit-register reporting.
   - Can source gas/handling values from `UCaddyVehicleTuningDataAsset`.
   - Simulates acceleration, coast deceleration, drag, lateral friction.
   - Rotates vehicle toward world move intent at steering rate.
-  - Applies movement with collision-safe sweep/slide.
+  - Applies movement with collision-safe sweep/slide and configurable arcade wall-glide smoothing.
+  - Emits collision events into HitRegister pipeline for centralized event gating.
   - Draws vehicle debug vectors (forward/target/velocity/lateral) in world.
 - `ACaddyVehiclePawn`
   - Owns collision, mesh, spring arm, top-down camera, movement component.
@@ -20,7 +22,7 @@
   - Keeps throttle independent from move intent.
   - Exposes `IAbilitySystemInterface` with built-in `UAbilitySystemComponent`.
   - Sends input to server through lightweight RPC for future online play.
-  - Registers vehicle debug providers into DebugFramework (`Vehicle` tool with multiple panels).
+  - Registers vehicle debug providers into DebugFramework (`Vehicle` tool with `Core/Input/Tuning/Collision/Debug Draw` panels).
   - Supports runtime tuning preset list and switching via console commands.
 - `ACaddyGameMode`
   - Sets default pawn and player controller.
@@ -32,6 +34,50 @@
 - `Caddy_Accelerate`: gas pedal behavior, no direct steering effect.
 - `Caddy_BrakeReverse`: brakes when moving forward, drives reverse when speed reaches zero.
 - `Caddy_Drift`: hold to reduce lateral grip and increase yaw steering rate.
+
+## Collision Handling
+- Collision flow:
+  - `PerformMovement` does iterative sweep (`MaxCollisionIterations`).
+  - On blocking hit, it resolves with `HandleBlockingCollision`.
+  - Response mode decides velocity behavior:
+    - `SlideOnly`: simple velocity projection on hit plane.
+    - `ArcadeWallGlide`: projects to wall tangent, adds intent assist, head-on fallback glide, and soft push-out.
+- Debug telemetry stored per last blocking hit:
+  - hit actor/location/normal/tangent
+  - total impact speed + normal impact speed
+  - hit register trigger/result status
+
+## Collision Tuning (Data Asset)
+- `CollisionConfig.ResponseMode`: collision response style switch.
+- `CollisionConfig.SpeedRetainRatio`: retained planar speed ratio after impact.
+- `CollisionConfig.MaxCollisionIterations`: max sweeps per tick for corner stability.
+- `CollisionConfig.WallGlideVelocityInterpSpeed`: how quickly velocity converges to tangent glide.
+- `CollisionConfig.WallGlideInputAssist`: how much player intent steers along wall tangent.
+- `CollisionConfig.MinNormalImpactSpeedForGlide`: minimum normal hit speed to enable strong glide assist.
+- `CollisionConfig.MinWallGlideSpeed`: minimum preserved glide speed for heavy impacts.
+- `CollisionConfig.HeadOnGlideSpeedScale`: converts head-on impact speed into tangent glide speed.
+- `CollisionConfig.PushOutDistance`: tiny push away from wall to reduce sticky contacts.
+- `CollisionConfig.DebugPersistSeconds`: persistence time for collision debug lines.
+
+## Collision HitRegister Bridge
+- Collision event publishing is configured under `CollisionConfig.HitRegister`.
+- Event is emitted only when all gates pass:
+  - `bEnableCollisionHitRegister`
+  - speed thresholds (`MinSpeedForEvent`, `MinNormalImpactSpeedForEvent`)
+  - cooldown (`EventCooldownSeconds`)
+- Attack payload:
+  - `BaseDamage = BaseDamageBias + NormalImpactSpeed * BaseDamageByNormalImpactSpeed`
+  - optional tags:
+    - base tags (`BaseTags`)
+    - target object type tags (`WorldStaticTag`, `WorldDynamicTag`, `PawnTag`)
+    - drift state tag (`DriftingTag`)
+  - optional attributes:
+    - speed (`SpeedAttributeTag`)
+    - normal impact speed (`NormalImpactSpeedAttributeTag`)
+    - drifting state (`DriftingAttributeTag`)
+- Pipeline source:
+  - uses `CollisionHitRegisterPipeline` from current tuning data asset (applied onto movement component)
+  - otherwise falls back to `HitRegisterSettings.DefaultPipeline`
 
 ## Multiplayer Notes
 - Current movement simulation runs on authority only.

@@ -1,7 +1,12 @@
 #include "Vehicle/ArcadeVehicleMovementComponent.h"
 
+#include "Components/PrimitiveComponent.h"
 #include "DrawDebugHelpers.h"
+#include "Engine/World.h"
 #include "GameFramework/Pawn.h"
+#include "HitRegister/HitRegisterBPLibrary.h"
+#include "HitRegister/HitRegisterPipeline.h"
+#include "HitRegister/HitRegisterTypes.h"
 #include "Vehicle/CaddyVehicleTuningDataAsset.h"
 
 UArcadeVehicleMovementComponent::UArcadeVehicleMovementComponent()
@@ -39,6 +44,8 @@ void UArcadeVehicleMovementComponent::ApplyTuningFromDataAsset()
 
     GasConfig = TuningDataAsset->GasConfig;
     HandlingConfig = TuningDataAsset->HandlingConfig;
+    CollisionConfig = TuningDataAsset->CollisionConfig;
+    CollisionHitRegisterPipeline = TuningDataAsset->CollisionHitRegisterPipeline;
 }
 
 FVector2D UArcadeVehicleMovementComponent::GetLocalPlanarVelocity() const
@@ -60,6 +67,21 @@ float UArcadeVehicleMovementComponent::GetTargetYawFromMoveIntent() const
     }
 
     return FMath::RadiansToDegrees(FMath::Atan2(MoveIntentWorldDir.Y, MoveIntentWorldDir.X));
+}
+
+float UArcadeVehicleMovementComponent::GetTimeSinceLastBlockingHit() const
+{
+    if (LastBlockingHitWorldTime < 0.0f || !GetWorld())
+    {
+        return -1.0f;
+    }
+
+    return GetWorld()->GetTimeSeconds() - LastBlockingHitWorldTime;
+}
+
+FString UArcadeVehicleMovementComponent::GetLastCollisionActorName() const
+{
+    return LastBlockingHitActor.IsValid() ? LastBlockingHitActor->GetName() : TEXT("None");
 }
 
 void UArcadeVehicleMovementComponent::SetMoveIntent(const FVector2D& InWorldDirection)
@@ -199,16 +221,302 @@ void UArcadeVehicleMovementComponent::PerformMovement(float DeltaTime)
         return;
     }
 
-    const FVector Delta = Velocity * DeltaTime;
-    FHitResult Hit;
-    SafeMoveUpdatedComponent(Delta, UpdatedComponent->GetComponentQuat(), true, Hit);
-
-    if (Hit.IsValidBlockingHit())
+    FVector RemainingDelta = Velocity * DeltaTime;
+    const int32 MaxIterations = FMath::Clamp(CollisionConfig.MaxCollisionIterations, 1, 4);
+    for (int32 Iteration = 0; Iteration < MaxIterations; ++Iteration)
     {
-        SlideAlongSurface(Delta, 1.0f - Hit.Time, Hit.Normal, Hit, true);
-        Velocity = FVector::VectorPlaneProject(Velocity, Hit.Normal) * HandlingConfig.CollisionSpeedRetainRatio;
-        Velocity.Z = 0.0f;
+        if (RemainingDelta.SizeSquared2D() <= FMath::Square(HandlingConfig.StopSpeedThreshold * DeltaTime))
+        {
+            break;
+        }
+
+        FHitResult Hit;
+        const FVector PreImpactVelocity = Velocity;
+        SafeMoveUpdatedComponent(RemainingDelta, UpdatedComponent->GetComponentQuat(), true, Hit);
+
+        if (!Hit.IsValidBlockingHit())
+        {
+            break;
+        }
+
+        HandleBlockingCollision(PreImpactVelocity, Hit, RemainingDelta, DeltaTime);
+
+        const float RemainingTimeRatio = FMath::Clamp(1.0f - Hit.Time, 0.0f, 1.0f);
+        if (RemainingTimeRatio <= KINDA_SMALL_NUMBER)
+        {
+            break;
+        }
+
+        RemainingDelta = Velocity * DeltaTime * RemainingTimeRatio;
     }
+
+    if (Velocity.SizeSquared2D() <= FMath::Square(HandlingConfig.StopSpeedThreshold))
+    {
+        Velocity = FVector::ZeroVector;
+    }
+}
+
+void UArcadeVehicleMovementComponent::HandleBlockingCollision(
+    const FVector& PreImpactVelocity,
+    const FHitResult& Hit,
+    const FVector& AttemptedDelta,
+    float DeltaTime)
+{
+    FHitResult SlideHit = Hit;
+    SlideAlongSurface(AttemptedDelta, 1.0f - Hit.Time, Hit.Normal, SlideHit, true);
+
+    float NormalImpactSpeed = 0.0f;
+    FVector TangentDirection = FVector::ZeroVector;
+    FVector ResolvedPlanarVelocity = FVector::VectorPlaneProject(PreImpactVelocity, Hit.Normal)
+        * FMath::Clamp(CollisionConfig.SpeedRetainRatio, 0.0f, 1.0f);
+
+    if (CollisionConfig.ResponseMode == ECaddyVehicleCollisionResponseMode::ArcadeWallGlide)
+    {
+        ResolvedPlanarVelocity = ComputeArcadeWallGlideVelocity(PreImpactVelocity, Hit, DeltaTime, NormalImpactSpeed, TangentDirection);
+    }
+    else
+    {
+        const FVector PlanarNormal = FVector(Hit.Normal.X, Hit.Normal.Y, 0.0f).GetSafeNormal();
+        const FVector PlanarVelocity = FVector(PreImpactVelocity.X, PreImpactVelocity.Y, 0.0f);
+        NormalImpactSpeed = FMath::Max(0.0f, -FVector::DotProduct(PlanarVelocity, PlanarNormal));
+        TangentDirection = FVector::VectorPlaneProject(PlanarVelocity, PlanarNormal).GetSafeNormal2D();
+    }
+
+    Velocity = ResolvedPlanarVelocity;
+    Velocity.Z = 0.0f;
+
+    const float TotalSpeed = FVector(PreImpactVelocity.X, PreImpactVelocity.Y, 0.0f).Size();
+    CacheCollisionTelemetry(Hit, TotalSpeed, NormalImpactSpeed, TangentDirection);
+    TryEmitCollisionHitRegisterEvent(Hit, TotalSpeed, NormalImpactSpeed);
+
+    if (CollisionConfig.PushOutDistance > KINDA_SMALL_NUMBER)
+    {
+        const FVector PlanarNormal = FVector(Hit.Normal.X, Hit.Normal.Y, 0.0f).GetSafeNormal();
+        if (!PlanarNormal.IsNearlyZero())
+        {
+            FHitResult PushOutHit;
+            SafeMoveUpdatedComponent(PlanarNormal * CollisionConfig.PushOutDistance, UpdatedComponent->GetComponentQuat(), true, PushOutHit);
+        }
+    }
+}
+
+FVector UArcadeVehicleMovementComponent::ComputeArcadeWallGlideVelocity(
+    const FVector& PreImpactVelocity,
+    const FHitResult& Hit,
+    float DeltaTime,
+    float& OutNormalImpactSpeed,
+    FVector& OutTangentDirection) const
+{
+    OutNormalImpactSpeed = 0.0f;
+    OutTangentDirection = FVector::ZeroVector;
+
+    const FVector PlanarNormal = FVector(Hit.Normal.X, Hit.Normal.Y, 0.0f).GetSafeNormal();
+    if (PlanarNormal.IsNearlyZero())
+    {
+        return FVector::ZeroVector;
+    }
+
+    const FVector PlanarVelocity = FVector(PreImpactVelocity.X, PreImpactVelocity.Y, 0.0f);
+    const FVector PlanarProjectedVelocity = FVector::VectorPlaneProject(PlanarVelocity, PlanarNormal);
+    const float ProjectedSpeed = PlanarProjectedVelocity.Size();
+
+    OutNormalImpactSpeed = FMath::Max(0.0f, -FVector::DotProduct(PlanarVelocity, PlanarNormal));
+    OutTangentDirection = PlanarProjectedVelocity.GetSafeNormal2D();
+
+    float TargetSpeed = ProjectedSpeed;
+    if (OutNormalImpactSpeed >= CollisionConfig.MinNormalImpactSpeedForGlide)
+    {
+        TargetSpeed = FMath::Max(TargetSpeed, OutNormalImpactSpeed * CollisionConfig.HeadOnGlideSpeedScale);
+    }
+
+    if (OutNormalImpactSpeed >= CollisionConfig.MinNormalImpactSpeedForGlide && TargetSpeed < CollisionConfig.MinWallGlideSpeed)
+    {
+        TargetSpeed = CollisionConfig.MinWallGlideSpeed;
+    }
+
+    if (OutTangentDirection.IsNearlyZero())
+    {
+        FVector PreferredDirection = UpdatedComponent
+            ? UpdatedComponent->GetForwardVector().GetSafeNormal2D()
+            : FVector::ForwardVector;
+        if (bHasMoveIntent)
+        {
+            PreferredDirection = FVector(MoveIntentWorldDir.X, MoveIntentWorldDir.Y, 0.0f).GetSafeNormal();
+        }
+
+        const FVector TangentA = FVector::CrossProduct(FVector::UpVector, PlanarNormal).GetSafeNormal2D();
+        const FVector TangentB = -TangentA;
+        const float DotA = FVector::DotProduct(TangentA, PreferredDirection);
+        const float DotB = FVector::DotProduct(TangentB, PreferredDirection);
+        OutTangentDirection = (DotA >= DotB) ? TangentA : TangentB;
+    }
+
+    FVector DesiredVelocity = OutTangentDirection * TargetSpeed;
+
+    if (bHasMoveIntent)
+    {
+        const FVector IntentDirection = FVector(MoveIntentWorldDir.X, MoveIntentWorldDir.Y, 0.0f).GetSafeNormal();
+        const FVector IntentAlongWall = FVector::VectorPlaneProject(IntentDirection, PlanarNormal).GetSafeNormal2D();
+        if (!IntentAlongWall.IsNearlyZero())
+        {
+            const float Assist = FMath::Clamp(CollisionConfig.WallGlideInputAssist, 0.0f, 1.0f);
+            DesiredVelocity = FMath::Lerp(DesiredVelocity, IntentAlongWall * TargetSpeed, Assist);
+            OutTangentDirection = DesiredVelocity.GetSafeNormal2D();
+        }
+    }
+
+    const float RetainRatio = FMath::Clamp(CollisionConfig.SpeedRetainRatio, 0.0f, 1.0f);
+    DesiredVelocity *= RetainRatio;
+
+    const float InterpSpeed = FMath::Max(0.0f, CollisionConfig.WallGlideVelocityInterpSpeed);
+    const FVector Blended = (InterpSpeed <= KINDA_SMALL_NUMBER)
+        ? DesiredVelocity
+        : FMath::VInterpTo(PlanarProjectedVelocity, DesiredVelocity, DeltaTime, InterpSpeed);
+
+    FVector Result = FVector(Blended.X, Blended.Y, 0.0f);
+    if (OutNormalImpactSpeed >= CollisionConfig.MinNormalImpactSpeedForGlide
+        && Result.SizeSquared2D() < FMath::Square(CollisionConfig.MinWallGlideSpeed * RetainRatio * 0.5f)
+        && !OutTangentDirection.IsNearlyZero())
+    {
+        Result = OutTangentDirection * (CollisionConfig.MinWallGlideSpeed * RetainRatio);
+    }
+
+    return Result;
+}
+
+void UArcadeVehicleMovementComponent::TryEmitCollisionHitRegisterEvent(const FHitResult& Hit, float TotalSpeed, float NormalImpactSpeed)
+{
+    bLastCollisionTriggeredHitRegister = false;
+    bLastCollisionHitRegisterSucceeded = false;
+    LastCollisionHitRegisterStatus = TEXT("Filtered");
+
+    if (!PawnOwner || !PawnOwner->HasAuthority())
+    {
+        LastCollisionHitRegisterStatus = TEXT("AuthorityOnly");
+        return;
+    }
+
+    const FCaddyVehicleCollisionHitRegisterConfig& HitRegisterConfig = CollisionConfig.HitRegister;
+    if (!HitRegisterConfig.bEnableCollisionHitRegister)
+    {
+        LastCollisionHitRegisterStatus = TEXT("Disabled");
+        return;
+    }
+
+    UWorld* World = GetWorld();
+    if (!World)
+    {
+        LastCollisionHitRegisterStatus = TEXT("NoWorld");
+        return;
+    }
+
+    const float Now = World->GetTimeSeconds();
+    if (HitRegisterConfig.EventCooldownSeconds > 0.0f
+        && LastCollisionHitRegisterWorldTime >= 0.0f
+        && (Now - LastCollisionHitRegisterWorldTime) < HitRegisterConfig.EventCooldownSeconds)
+    {
+        LastCollisionHitRegisterStatus = TEXT("Cooldown");
+        return;
+    }
+
+    if (TotalSpeed < HitRegisterConfig.MinSpeedForEvent)
+    {
+        LastCollisionHitRegisterStatus = TEXT("SpeedBelowThreshold");
+        return;
+    }
+
+    if (NormalImpactSpeed < HitRegisterConfig.MinNormalImpactSpeedForEvent)
+    {
+        LastCollisionHitRegisterStatus = TEXT("NormalSpeedBelowThreshold");
+        return;
+    }
+
+    FAttackRequest AttackRequest;
+    AttackRequest.Instigator = PawnOwner;
+    AttackRequest.SourceObject = this;
+    AttackRequest.BaseDamage = FMath::Max(
+        0.0f,
+        HitRegisterConfig.BaseDamageBias + (NormalImpactSpeed * HitRegisterConfig.BaseDamageByNormalImpactSpeed));
+    AttackRequest.Tags.AppendTags(HitRegisterConfig.BaseTags);
+
+    const UPrimitiveComponent* HitComponent = Hit.GetComponent();
+    if (HitComponent)
+    {
+        if (HitComponent->GetCollisionObjectType() == ECC_WorldStatic && HitRegisterConfig.WorldStaticTag.IsValid())
+        {
+            AttackRequest.Tags.AddTag(HitRegisterConfig.WorldStaticTag);
+        }
+        if (HitComponent->GetCollisionObjectType() == ECC_WorldDynamic && HitRegisterConfig.WorldDynamicTag.IsValid())
+        {
+            AttackRequest.Tags.AddTag(HitRegisterConfig.WorldDynamicTag);
+        }
+        if (HitComponent->GetCollisionObjectType() == ECC_Pawn && HitRegisterConfig.PawnTag.IsValid())
+        {
+            AttackRequest.Tags.AddTag(HitRegisterConfig.PawnTag);
+        }
+    }
+
+    if (bIsDrifting && HitRegisterConfig.DriftingTag.IsValid())
+    {
+        AttackRequest.Tags.AddTag(HitRegisterConfig.DriftingTag);
+    }
+
+    if (HitRegisterConfig.SpeedAttributeTag.IsValid())
+    {
+        AttackRequest.Attributes.Add(HitRegisterConfig.SpeedAttributeTag, TotalSpeed);
+    }
+    if (HitRegisterConfig.NormalImpactSpeedAttributeTag.IsValid())
+    {
+        AttackRequest.Attributes.Add(HitRegisterConfig.NormalImpactSpeedAttributeTag, NormalImpactSpeed);
+    }
+    if (HitRegisterConfig.DriftingAttributeTag.IsValid())
+    {
+        AttackRequest.Attributes.Add(HitRegisterConfig.DriftingAttributeTag, bIsDrifting ? 1.0f : 0.0f);
+    }
+
+    FHitRegisterContext Context;
+    bool bHitRegisterResult = false;
+    if (CollisionHitRegisterPipeline)
+    {
+        bHitRegisterResult = UHitRegisterBPLibrary::ExecuteHitRegister(this, AttackRequest, Hit, CollisionHitRegisterPipeline, Context);
+    }
+    else
+    {
+        bHitRegisterResult = UHitRegisterBPLibrary::ExecuteHitRegisterDefault(this, AttackRequest, Hit, Context);
+    }
+
+    bLastCollisionTriggeredHitRegister = true;
+    bLastCollisionHitRegisterSucceeded = bHitRegisterResult;
+    LastCollisionHitRegisterWorldTime = Now;
+
+    if (bHitRegisterResult)
+    {
+        LastCollisionHitRegisterStatus = TEXT("Success");
+    }
+    else
+    {
+        const UEnum* StopReasonEnum = StaticEnum<EHitRegisterStopReason>();
+        const FString StopReason = StopReasonEnum
+            ? StopReasonEnum->GetNameStringByValue(static_cast<int64>(Context.Result.StopReason))
+            : TEXT("Unknown");
+        LastCollisionHitRegisterStatus = FString::Printf(TEXT("Stopped:%s"), *StopReason);
+    }
+}
+
+void UArcadeVehicleMovementComponent::CacheCollisionTelemetry(
+    const FHitResult& Hit,
+    float TotalSpeed,
+    float NormalImpactSpeed,
+    const FVector& TangentDirection)
+{
+    UWorld* World = GetWorld();
+    LastBlockingHitWorldTime = World ? World->GetTimeSeconds() : -1.0f;
+    LastBlockingHitSpeed = TotalSpeed;
+    LastBlockingHitNormalSpeed = NormalImpactSpeed;
+    LastBlockingHitLocation = Hit.ImpactPoint;
+    LastBlockingHitNormal = Hit.Normal.GetSafeNormal();
+    LastBlockingHitTangent = TangentDirection.GetSafeNormal2D();
+    LastBlockingHitActor = Hit.GetActor();
 }
 
 void UArcadeVehicleMovementComponent::DrawDebugVisuals() const
@@ -265,5 +573,29 @@ void UArcadeVehicleMovementComponent::DrawDebugVisuals() const
     if (bIsDrifting)
     {
         DrawDebugSphere(World, Origin + FVector(0.0f, 0.0f, 14.0f), 12.0f, 10, FColor::Magenta, false, 0.0f, 0, Thickness * 0.75f);
+    }
+
+    const float CollisionAge = (LastBlockingHitWorldTime >= 0.0f) ? (World->GetTimeSeconds() - LastBlockingHitWorldTime) : BIG_NUMBER;
+    if (CollisionAge <= CollisionConfig.DebugPersistSeconds)
+    {
+        const FVector HitPoint = LastBlockingHitLocation + FVector(0.0f, 0.0f, 3.0f);
+        const FVector HitNormal = LastBlockingHitNormal.GetSafeNormal();
+        const FVector HitTangent = LastBlockingHitTangent.GetSafeNormal2D();
+
+        DrawDebugSphere(World, HitPoint, 10.0f, 10, FColor::Red, false, 0.0f, 0, Thickness);
+        if (!HitNormal.IsNearlyZero())
+        {
+            DrawDebugLine(World, HitPoint, HitPoint + (HitNormal * 120.0f), FColor::Red, false, 0.0f, 0, Thickness);
+        }
+        if (!HitTangent.IsNearlyZero())
+        {
+            DrawDebugLine(World, HitPoint, HitPoint + (HitTangent * 120.0f), FColor::Blue, false, 0.0f, 0, Thickness);
+        }
+
+        if (bLastCollisionTriggeredHitRegister)
+        {
+            const FColor HitRegisterColor = bLastCollisionHitRegisterSucceeded ? FColor::Green : FColor::Orange;
+            DrawDebugSphere(World, HitPoint + FVector(0.0f, 0.0f, 18.0f), 6.0f, 8, HitRegisterColor, false, 0.0f, 0, Thickness * 0.8f);
+        }
     }
 }

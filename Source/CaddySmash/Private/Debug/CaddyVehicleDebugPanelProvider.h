@@ -12,6 +12,7 @@ enum class ECaddyVehicleDebugPanelType : uint8
     Core,
     Input,
     Tuning,
+    Collision,
     DebugDraw
 };
 
@@ -41,6 +42,7 @@ private:
     void GatherCoreRows(TArray<FDebugFrameworkPanelRow>& OutRows) const;
     void GatherInputRows(TArray<FDebugFrameworkPanelRow>& OutRows) const;
     void GatherTuningRows(TArray<FDebugFrameworkPanelRow>& OutRows) const;
+    void GatherCollisionRows(TArray<FDebugFrameworkPanelRow>& OutRows) const;
     void GatherDebugDrawRows(TArray<FDebugFrameworkPanelRow>& OutRows) const;
 
     TWeakObjectPtr<ACaddyVehiclePawn> VehiclePawn;

@@ -32,6 +32,10 @@
 		{
 			"Name": "DebugFramework",
 			"Enabled": true
+		},
+		{
+			"Name": "HitRegister",
+			"Enabled": true
 		}
 	]
 }
