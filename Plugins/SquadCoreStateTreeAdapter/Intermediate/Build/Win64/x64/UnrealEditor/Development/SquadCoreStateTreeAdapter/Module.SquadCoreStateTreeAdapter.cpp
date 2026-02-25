@@ -3,3 +3,7 @@
 #include "D:/UnrealLibrary/CaddySmash 5.7/Plugins/SquadCoreStateTreeAdapter/Intermediate/Build/Win64/UnrealEditor/Inc/SquadCoreStateTreeAdapter/UHT/SquadStateTreeConditions.gen.cpp"
 #include "D:/UnrealLibrary/CaddySmash 5.7/Plugins/SquadCoreStateTreeAdapter/Intermediate/Build/Win64/UnrealEditor/Inc/SquadCoreStateTreeAdapter/UHT/SquadStateTreeTasks.gen.cpp"
 #include "D:/UnrealLibrary/CaddySmash 5.7/Plugins/SquadCoreStateTreeAdapter/Intermediate/Build/Win64/x64/UnrealEditor/Development/SquadCoreStateTreeAdapter/PerModuleInline.gen.cpp"
+#include "D:/UnrealLibrary/CaddySmash 5.7/Plugins/SquadCoreStateTreeAdapter/Source/SquadCoreStateTreeAdapter/Private/SquadCoreStateTreeAdapterModule.cpp"
+#include "D:/UnrealLibrary/CaddySmash 5.7/Plugins/SquadCoreStateTreeAdapter/Source/SquadCoreStateTreeAdapter/Private/SquadCore/StateTree/SquadStateTreeConditions.cpp"
+#include "D:/UnrealLibrary/CaddySmash 5.7/Plugins/SquadCoreStateTreeAdapter/Source/SquadCoreStateTreeAdapter/Private/SquadCore/StateTree/SquadStateTreeLog.cpp"
+#include "D:/UnrealLibrary/CaddySmash 5.7/Plugins/SquadCoreStateTreeAdapter/Source/SquadCoreStateTreeAdapter/Private/SquadCore/StateTree/SquadStateTreeTasks.cpp"

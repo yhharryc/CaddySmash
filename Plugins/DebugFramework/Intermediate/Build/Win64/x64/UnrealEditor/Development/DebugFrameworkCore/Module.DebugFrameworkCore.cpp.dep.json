@@ -23,7 +23,15 @@
             "d:\\unreallibrary\\caddysmash 5.7\\plugins\\debugframework\\source\\debugframeworkcore\\public\\debugframework\\debugframeworkusersettings.h",
             "d:\\unreallibrary\\caddysmash 5.7\\plugins\\debugframework\\intermediate\\build\\win64\\unrealeditor\\inc\\debugframeworkcore\\uht\\debugframeworkusersettings.generated.h",
             "d:\\unreallibrary\\caddysmash 5.7\\plugins\\debugframework\\intermediate\\build\\win64\\x64\\unrealeditor\\development\\debugframeworkcore\\permoduleinline.gen.cpp",
-            "d:\\ue_5.7\\engine\\source\\runtime\\core\\public\\hal\\permoduleinline.inl"
+            "d:\\ue_5.7\\engine\\source\\runtime\\core\\public\\hal\\permoduleinline.inl",
+            "d:\\unreallibrary\\caddysmash 5.7\\plugins\\debugframework\\source\\debugframeworkcore\\private\\debugframework\\debugframeworkcoremodule.cpp",
+            "d:\\unreallibrary\\caddysmash 5.7\\plugins\\debugframework\\source\\debugframeworkcore\\public\\debugframework\\debugframeworkcoremodule.h",
+            "d:\\unreallibrary\\caddysmash 5.7\\plugins\\debugframework\\source\\debugframeworkcore\\private\\debugframework\\debugframeworklog.cpp",
+            "d:\\unreallibrary\\caddysmash 5.7\\plugins\\debugframework\\source\\debugframeworkcore\\public\\debugframework\\debugframeworklog.h",
+            "d:\\unreallibrary\\caddysmash 5.7\\plugins\\debugframework\\source\\debugframeworkcore\\private\\debugframework\\debugframeworksettings.cpp",
+            "d:\\unreallibrary\\caddysmash 5.7\\plugins\\debugframework\\source\\debugframeworkcore\\private\\debugframework\\debugframeworksubsystem.cpp",
+            "d:\\unreallibrary\\caddysmash 5.7\\plugins\\debugframework\\source\\debugframeworkcore\\public\\debugframework\\debugframeworkplayercontrollerutils.h",
+            "d:\\unreallibrary\\caddysmash 5.7\\plugins\\debugframework\\source\\debugframeworkcore\\private\\debugframework\\debugframeworkusersettings.cpp"
         ],
         "ImportedModules": [],
         "ImportedHeaderUnits": []

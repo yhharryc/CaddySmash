@@ -2,3 +2,5 @@
 #include "D:/UnrealLibrary/CaddySmash 5.7/Plugins/HitRegisterGASAdapter/Intermediate/Build/Win64/UnrealEditor/Inc/HitRegisterGASAdapter/UHT/HitRegisterGASAdapter.init.gen.cpp"
 #include "D:/UnrealLibrary/CaddySmash 5.7/Plugins/HitRegisterGASAdapter/Intermediate/Build/Win64/UnrealEditor/Inc/HitRegisterGASAdapter/UHT/HitRegisterGASDamageableComponent.gen.cpp"
 #include "D:/UnrealLibrary/CaddySmash 5.7/Plugins/HitRegisterGASAdapter/Intermediate/Build/Win64/x64/UnrealEditor/Development/HitRegisterGASAdapter/PerModuleInline.gen.cpp"
+#include "D:/UnrealLibrary/CaddySmash 5.7/Plugins/HitRegisterGASAdapter/Source/HitRegisterGASAdapter/Private/HitRegisterGASAdapterModule.cpp"
+#include "D:/UnrealLibrary/CaddySmash 5.7/Plugins/HitRegisterGASAdapter/Source/HitRegisterGASAdapter/Private/HitRegisterGAS/HitRegisterGASDamageableComponent.cpp"

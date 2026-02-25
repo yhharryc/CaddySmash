@@ -6,3 +6,8 @@
 #include "D:/UnrealLibrary/CaddySmash 5.7/Plugins/DebugFramework/Intermediate/Build/Win64/UnrealEditor/Inc/DebugFrameworkCore/UHT/DebugFrameworkTypes.gen.cpp"
 #include "D:/UnrealLibrary/CaddySmash 5.7/Plugins/DebugFramework/Intermediate/Build/Win64/UnrealEditor/Inc/DebugFrameworkCore/UHT/DebugFrameworkUserSettings.gen.cpp"
 #include "D:/UnrealLibrary/CaddySmash 5.7/Plugins/DebugFramework/Intermediate/Build/Win64/x64/UnrealEditor/Development/DebugFrameworkCore/PerModuleInline.gen.cpp"
+#include "D:/UnrealLibrary/CaddySmash 5.7/Plugins/DebugFramework/Source/DebugFrameworkCore/Private/DebugFramework/DebugFrameworkCoreModule.cpp"
+#include "D:/UnrealLibrary/CaddySmash 5.7/Plugins/DebugFramework/Source/DebugFrameworkCore/Private/DebugFramework/DebugFrameworkLog.cpp"
+#include "D:/UnrealLibrary/CaddySmash 5.7/Plugins/DebugFramework/Source/DebugFrameworkCore/Private/DebugFramework/DebugFrameworkSettings.cpp"
+#include "D:/UnrealLibrary/CaddySmash 5.7/Plugins/DebugFramework/Source/DebugFrameworkCore/Private/DebugFramework/DebugFrameworkSubsystem.cpp"
+#include "D:/UnrealLibrary/CaddySmash 5.7/Plugins/DebugFramework/Source/DebugFrameworkCore/Private/DebugFramework/DebugFrameworkUserSettings.cpp"

@@ -41,7 +41,17 @@
             "d:\\unreallibrary\\caddysmash 5.7\\plugins\\hitregister\\source\\hitregistercore\\public\\hitregister\\nodes\\hrn_validatehit.h",
             "d:\\unreallibrary\\caddysmash 5.7\\plugins\\hitregister\\intermediate\\build\\win64\\unrealeditor\\inc\\hitregistercore\\uht\\hrn_validatehit.generated.h",
             "d:\\unreallibrary\\caddysmash 5.7\\plugins\\hitregister\\intermediate\\build\\win64\\x64\\unrealeditor\\development\\hitregistercore\\permoduleinline.gen.cpp",
-            "d:\\ue_5.7\\engine\\source\\runtime\\core\\public\\hal\\permoduleinline.inl"
+            "d:\\ue_5.7\\engine\\source\\runtime\\core\\public\\hal\\permoduleinline.inl",
+            "d:\\unreallibrary\\caddysmash 5.7\\plugins\\hitregister\\source\\hitregistercore\\private\\hitregistercoremodule.cpp",
+            "d:\\unreallibrary\\caddysmash 5.7\\plugins\\hitregister\\source\\hitregistercore\\public\\hitregistercoremodule.h",
+            "d:\\unreallibrary\\caddysmash 5.7\\plugins\\hitregister\\source\\hitregistercore\\private\\hitregister\\hitregisterbplibrary.cpp",
+            "d:\\unreallibrary\\caddysmash 5.7\\plugins\\hitregister\\source\\hitregistercore\\private\\hitregister\\hitregistersettings.cpp",
+            "d:\\ue_5.7\\engine\\source\\runtime\\gameplaytags\\classes\\gameplaytagsmanager.h",
+            "d:\\ue_5.7\\engine\\intermediate\\build\\win64\\unrealeditor\\inc\\gameplaytags\\uht\\gameplaytagsmanager.generated.h",
+            "d:\\unreallibrary\\caddysmash 5.7\\plugins\\hitregister\\source\\hitregistercore\\private\\hitregister\\hitregistersubsystem.cpp",
+            "d:\\unreallibrary\\caddysmash 5.7\\plugins\\hitregister\\source\\hitregistercore\\private\\hitregister\\nodes\\hrn_applydamageviainterface.cpp",
+            "d:\\unreallibrary\\caddysmash 5.7\\plugins\\hitregister\\source\\hitregistercore\\private\\hitregister\\nodes\\hrn_builddamagefromattributes.cpp",
+            "d:\\unreallibrary\\caddysmash 5.7\\plugins\\hitregister\\source\\hitregistercore\\private\\hitregister\\nodes\\hrn_validatehit.cpp"
         ],
         "ImportedModules": [],
         "ImportedHeaderUnits": []

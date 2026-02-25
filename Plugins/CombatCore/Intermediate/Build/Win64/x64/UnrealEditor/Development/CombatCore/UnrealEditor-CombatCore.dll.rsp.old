@@ -36,9 +36,16 @@
 /FUNCTIONPADMIN:6
 /NOIMPLIB
 /NOEXP
-"D:/UnrealLibrary/GroupSurvivor/Intermediate/Build/Win64/x64/GroupSurvivorEditor/Development/UnrealEd/SharedPCH.UnrealEd.Project.ValApi.ValExpApi.Cpp20.InclOrderUnreal5_4.h.obj"
-"D:/UnrealLibrary/GroupSurvivor/Plugins/CombatCore/Intermediate/Build/Win64/x64/UnrealEditor/Development/CombatCore/Module.CombatCore.cpp.obj"
-"D:/UnrealLibrary/GroupSurvivor/Plugins/CombatCore/Intermediate/Build/Win64/x64/UnrealEditor/Development/CombatCore/Default.rc2.res"
+"D:/UnrealLibrary/CaddySmash 5.7/Intermediate/Build/Win64/x64/CaddySmashEditor/Development/UnrealEd/SharedPCH.UnrealEd.Project.ValApi.ValExpApi.Cpp20.InclOrderUnreal5_4.h.obj"
+"D:/UnrealLibrary/CaddySmash 5.7/Plugins/CombatCore/Intermediate/Build/Win64/x64/UnrealEditor/Development/CombatCore/Module.CombatCore.cpp.obj"
+"D:/UnrealLibrary/CaddySmash 5.7/Plugins/CombatCore/Intermediate/Build/Win64/x64/UnrealEditor/Development/CombatCore/CombatCoreModule.cpp.obj"
+"D:/UnrealLibrary/CaddySmash 5.7/Plugins/CombatCore/Intermediate/Build/Win64/x64/UnrealEditor/Development/CombatCore/AttackOrchestratorComponent.cpp.obj"
+"D:/UnrealLibrary/CaddySmash 5.7/Plugins/CombatCore/Intermediate/Build/Win64/x64/UnrealEditor/Development/CombatCore/AttackRangeModel.cpp.obj"
+"D:/UnrealLibrary/CaddySmash 5.7/Plugins/CombatCore/Intermediate/Build/Win64/x64/UnrealEditor/Development/CombatCore/AttackRangeModelTemplates.cpp.obj"
+"D:/UnrealLibrary/CaddySmash 5.7/Plugins/CombatCore/Intermediate/Build/Win64/x64/UnrealEditor/Development/CombatCore/CombatCoreLog.cpp.obj"
+"D:/UnrealLibrary/CaddySmash 5.7/Plugins/CombatCore/Intermediate/Build/Win64/x64/UnrealEditor/Development/CombatCore/CombatWeaponActor.cpp.obj"
+"D:/UnrealLibrary/CaddySmash 5.7/Plugins/CombatCore/Intermediate/Build/Win64/x64/UnrealEditor/Development/CombatCore/WeaponHitscanComponent.cpp.obj"
+"D:/UnrealLibrary/CaddySmash 5.7/Plugins/CombatCore/Intermediate/Build/Win64/x64/UnrealEditor/Development/CombatCore/Default.rc2.res"
 "../Intermediate/Build/Win64/x64/UnrealEditor/Development/Core/UnrealEditor-Core.lib"
 "../Intermediate/Build/Win64/x64/UnrealEditor/Development/CoreUObject/UnrealEditor-CoreUObject.lib"
 "../Intermediate/Build/Win64/x64/UnrealEditor/Development/Engine/UnrealEditor-Engine.lib"
@@ -68,6 +75,6 @@
 "synchronization.lib"
 "dwmapi.lib"
 "imm32.lib"
-/OUT:"D:/UnrealLibrary/GroupSurvivor/Plugins/CombatCore/Binaries/Win64/UnrealEditor-CombatCore.dll"
-/PDB:"D:/UnrealLibrary/GroupSurvivor/Plugins/CombatCore/Binaries/Win64/UnrealEditor-CombatCore.pdb"
+/OUT:"D:/UnrealLibrary/CaddySmash 5.7/Plugins/CombatCore/Binaries/Win64/UnrealEditor-CombatCore.dll"
+/PDB:"D:/UnrealLibrary/CaddySmash 5.7/Plugins/CombatCore/Binaries/Win64/UnrealEditor-CombatCore.pdb"
 /ignore:4078

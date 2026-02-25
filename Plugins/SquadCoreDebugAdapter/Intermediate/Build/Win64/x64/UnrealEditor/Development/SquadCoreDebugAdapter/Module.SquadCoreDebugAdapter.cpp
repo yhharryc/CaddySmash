@@ -4,3 +4,7 @@
 #include "D:/UnrealLibrary/CaddySmash 5.7/Plugins/SquadCoreDebugAdapter/Intermediate/Build/Win64/UnrealEditor/Inc/SquadCoreDebugAdapter/UHT/SquadDebugHUD.gen.cpp"
 #include "D:/UnrealLibrary/CaddySmash 5.7/Plugins/SquadCoreDebugAdapter/Intermediate/Build/Win64/UnrealEditor/Inc/SquadCoreDebugAdapter/UHT/SquadDebugWidget.gen.cpp"
 #include "D:/UnrealLibrary/CaddySmash 5.7/Plugins/SquadCoreDebugAdapter/Intermediate/Build/Win64/x64/UnrealEditor/Development/SquadCoreDebugAdapter/PerModuleInline.gen.cpp"
+#include "D:/UnrealLibrary/CaddySmash 5.7/Plugins/SquadCoreDebugAdapter/Source/SquadCoreDebugAdapter/Private/SquadCoreDebugAdapterModule.cpp"
+#include "D:/UnrealLibrary/CaddySmash 5.7/Plugins/SquadCoreDebugAdapter/Source/SquadCoreDebugAdapter/Private/SquadCore/SquadDebugComponent.cpp"
+#include "D:/UnrealLibrary/CaddySmash 5.7/Plugins/SquadCoreDebugAdapter/Source/SquadCoreDebugAdapter/Private/SquadCore/SquadDebugHUD.cpp"
+#include "D:/UnrealLibrary/CaddySmash 5.7/Plugins/SquadCoreDebugAdapter/Source/SquadCoreDebugAdapter/Private/SquadCore/SquadDebugWidget.cpp"

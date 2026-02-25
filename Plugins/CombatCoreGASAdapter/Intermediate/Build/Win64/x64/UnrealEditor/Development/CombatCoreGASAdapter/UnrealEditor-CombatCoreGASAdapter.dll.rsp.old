@@ -36,16 +36,20 @@
 /FUNCTIONPADMIN:6
 /NOIMPLIB
 /NOEXP
-"D:/UnrealLibrary/GroupSurvivor/Intermediate/Build/Win64/x64/GroupSurvivorEditor/Development/UnrealEd/SharedPCH.UnrealEd.Project.ValApi.ValExpApi.Cpp20.InclOrderUnreal5_4.h.obj"
-"D:/UnrealLibrary/GroupSurvivor/Plugins/CombatCoreGASAdapter/Intermediate/Build/Win64/x64/UnrealEditor/Development/CombatCoreGASAdapter/Module.CombatCoreGASAdapter.cpp.obj"
-"D:/UnrealLibrary/GroupSurvivor/Plugins/CombatCoreGASAdapter/Intermediate/Build/Win64/x64/UnrealEditor/Development/CombatCoreGASAdapter/Default.rc2.res"
+"D:/UnrealLibrary/CaddySmash 5.7/Intermediate/Build/Win64/x64/CaddySmashEditor/Development/UnrealEd/SharedPCH.UnrealEd.Project.ValApi.ValExpApi.Cpp20.InclOrderUnreal5_4.h.obj"
+"D:/UnrealLibrary/CaddySmash 5.7/Plugins/CombatCoreGASAdapter/Intermediate/Build/Win64/x64/UnrealEditor/Development/CombatCoreGASAdapter/Module.CombatCoreGASAdapter.cpp.obj"
+"D:/UnrealLibrary/CaddySmash 5.7/Plugins/CombatCoreGASAdapter/Intermediate/Build/Win64/x64/UnrealEditor/Development/CombatCoreGASAdapter/CombatCoreGASAdapterModule.cpp.obj"
+"D:/UnrealLibrary/CaddySmash 5.7/Plugins/CombatCoreGASAdapter/Intermediate/Build/Win64/x64/UnrealEditor/Development/CombatCoreGASAdapter/AttackAbility.cpp.obj"
+"D:/UnrealLibrary/CaddySmash 5.7/Plugins/CombatCoreGASAdapter/Intermediate/Build/Win64/x64/UnrealEditor/Development/CombatCoreGASAdapter/CombatCoreGASAdapterLog.cpp.obj"
+"D:/UnrealLibrary/CaddySmash 5.7/Plugins/CombatCoreGASAdapter/Intermediate/Build/Win64/x64/UnrealEditor/Development/CombatCoreGASAdapter/CombatGASAttackAdapterComponent.cpp.obj"
+"D:/UnrealLibrary/CaddySmash 5.7/Plugins/CombatCoreGASAdapter/Intermediate/Build/Win64/x64/UnrealEditor/Development/CombatCoreGASAdapter/Default.rc2.res"
 "../Intermediate/Build/Win64/x64/UnrealEditor/Development/Core/UnrealEditor-Core.lib"
 "../Intermediate/Build/Win64/x64/UnrealEditor/Development/CoreUObject/UnrealEditor-CoreUObject.lib"
 "../Intermediate/Build/Win64/x64/UnrealEditor/Development/Engine/UnrealEditor-Engine.lib"
 "../Intermediate/Build/Win64/x64/UnrealEditor/Development/GameplayTags/UnrealEditor-GameplayTags.lib"
 "../Plugins/Runtime/GameplayAbilities/Intermediate/Build/Win64/x64/UnrealEditor/Development/GameplayAbilities/UnrealEditor-GameplayAbilities.lib"
 "../Intermediate/Build/Win64/x64/UnrealEditor/Development/GameplayTasks/UnrealEditor-GameplayTasks.lib"
-"D:/UnrealLibrary/GroupSurvivor/Plugins/CombatCore/Intermediate/Build/Win64/x64/UnrealEditor/Development/CombatCore/UnrealEditor-CombatCore.lib"
+"D:/UnrealLibrary/CaddySmash 5.7/Plugins/CombatCore/Intermediate/Build/Win64/x64/UnrealEditor/Development/CombatCore/UnrealEditor-CombatCore.lib"
 "delayimp.lib"
 "wininet.lib"
 "rpcrt4.lib"
@@ -71,6 +75,6 @@
 "synchronization.lib"
 "dwmapi.lib"
 "imm32.lib"
-/OUT:"D:/UnrealLibrary/GroupSurvivor/Plugins/CombatCoreGASAdapter/Binaries/Win64/UnrealEditor-CombatCoreGASAdapter.dll"
-/PDB:"D:/UnrealLibrary/GroupSurvivor/Plugins/CombatCoreGASAdapter/Binaries/Win64/UnrealEditor-CombatCoreGASAdapter.pdb"
+/OUT:"D:/UnrealLibrary/CaddySmash 5.7/Plugins/CombatCoreGASAdapter/Binaries/Win64/UnrealEditor-CombatCoreGASAdapter.dll"
+/PDB:"D:/UnrealLibrary/CaddySmash 5.7/Plugins/CombatCoreGASAdapter/Binaries/Win64/UnrealEditor-CombatCoreGASAdapter.pdb"
 /ignore:4078

@@ -3,3 +3,7 @@
 #include "D:/UnrealLibrary/CaddySmash 5.7/Plugins/CombatCoreGASAdapter/Intermediate/Build/Win64/UnrealEditor/Inc/CombatCoreGASAdapter/UHT/CombatCoreGASAdapter.init.gen.cpp"
 #include "D:/UnrealLibrary/CaddySmash 5.7/Plugins/CombatCoreGASAdapter/Intermediate/Build/Win64/UnrealEditor/Inc/CombatCoreGASAdapter/UHT/CombatGASAttackAdapterComponent.gen.cpp"
 #include "D:/UnrealLibrary/CaddySmash 5.7/Plugins/CombatCoreGASAdapter/Intermediate/Build/Win64/x64/UnrealEditor/Development/CombatCoreGASAdapter/PerModuleInline.gen.cpp"
+#include "D:/UnrealLibrary/CaddySmash 5.7/Plugins/CombatCoreGASAdapter/Source/CombatCoreGASAdapter/Private/CombatCoreGASAdapterModule.cpp"
+#include "D:/UnrealLibrary/CaddySmash 5.7/Plugins/CombatCoreGASAdapter/Source/CombatCoreGASAdapter/Private/Combat/AttackAbility.cpp"
+#include "D:/UnrealLibrary/CaddySmash 5.7/Plugins/CombatCoreGASAdapter/Source/CombatCoreGASAdapter/Private/Combat/CombatCoreGASAdapterLog.cpp"
+#include "D:/UnrealLibrary/CaddySmash 5.7/Plugins/CombatCoreGASAdapter/Source/CombatCoreGASAdapter/Private/Combat/CombatGASAttackAdapterComponent.cpp"
