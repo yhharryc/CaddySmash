@@ -7,6 +7,7 @@
 
 class UAbilitySystemComponent;
 class UCaddyVehicleCameraComponent;
+class UCaddyVehicleFeelComponent;
 class UArcadeVehicleMovementComponent;
 class UCaddyVehicleDebugPanelProvider;
 class UCaddyVehicleTuningDataAsset;
@@ -52,6 +53,9 @@ public:
     UFUNCTION(BlueprintPure, Category="Vehicle|Components")
     UCaddyVehicleCameraComponent* GetVehicleCameraComponent() const { return VehicleCameraComponent; }
 
+    UFUNCTION(BlueprintPure, Category="Vehicle|Components")
+    UCaddyVehicleFeelComponent* GetVehicleFeelComponent() const { return VehicleFeelComponent; }
+
     UFUNCTION(BlueprintCallable, Category="Vehicle|Config")
     bool ApplyRuntimeTuningPresetByIndex(int32 InIndex);
 
@@ -85,6 +89,9 @@ protected:
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Vehicle|Components")
     TObjectPtr<UCaddyVehicleCameraComponent> VehicleCameraComponent;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Vehicle|Components")
+    TObjectPtr<UCaddyVehicleFeelComponent> VehicleFeelComponent;
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Vehicle|Ability")
     TObjectPtr<UAbilitySystemComponent> AbilitySystemComponent;

@@ -4,6 +4,7 @@
 #include "Engine/DataAsset.h"
 #include "Vehicle/ArcadeVehicleMovementComponent.h"
 #include "Vehicle/CaddyVehicleCameraComponent.h"
+#include "Vehicle/CaddyVehicleFeelComponent.h"
 #include "CaddyVehicleTuningDataAsset.generated.h"
 
 class UHitRegisterPipeline;
@@ -25,6 +26,9 @@ public:
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Vehicle|Camera")
     FCaddyVehicleCameraConfig CameraConfig;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Vehicle|Feel")
+    FCaddyVehicleFeelConfig FeelConfig;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Vehicle|Config|Collision|HitRegister")
     TObjectPtr<UHitRegisterPipeline> CollisionHitRegisterPipeline = nullptr;

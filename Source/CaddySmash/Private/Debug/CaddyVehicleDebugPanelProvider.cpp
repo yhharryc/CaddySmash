@@ -3,6 +3,7 @@
 #include "HitRegister/HitRegisterPipeline.h"
 #include "Vehicle/ArcadeVehicleMovementComponent.h"
 #include "Vehicle/CaddyVehicleCameraComponent.h"
+#include "Vehicle/CaddyVehicleFeelComponent.h"
 #include "Vehicle/CaddyVehiclePawn.h"
 #include "Vehicle/CaddyVehicleTuningDataAsset.h"
 
@@ -89,6 +90,9 @@ void UCaddyVehicleDebugPanelProvider::GatherDebugRows_Implementation(TArray<FDeb
         break;
     case ECaddyVehicleDebugPanelType::Tuning:
         GatherTuningRows(OutRows);
+        break;
+    case ECaddyVehicleDebugPanelType::Feel:
+        GatherFeelRows(OutRows);
         break;
     case ECaddyVehicleDebugPanelType::Camera:
         GatherCameraRows(OutRows);
@@ -206,6 +210,51 @@ void UCaddyVehicleDebugPanelProvider::GatherTuningRows(TArray<FDebugFrameworkPan
         AddRow(OutRows, TEXT("Cam BasePitch"), FString::Printf(TEXT("%.1f"), CameraComponent->CameraConfig.BasePitchDeg));
         AddRow(OutRows, TEXT("Cam BaseFOV"), FString::Printf(TEXT("%.1f"), CameraComponent->CameraConfig.BaseFOV));
     }
+    if (const UCaddyVehicleFeelComponent* FeelComponent = Pawn->GetVehicleFeelComponent())
+    {
+        AddRow(OutRows, TEXT("Feel Enabled"), BoolToOnOff(FeelComponent->FeelConfig.bEnableFeel));
+        AddRow(OutRows, TEXT("Feel IdleAmp"), FString::Printf(TEXT("%.2f"), FeelComponent->FeelConfig.IdleShakeLocationAmplitude));
+        AddRow(OutRows, TEXT("Feel MaxLean"), FString::Printf(TEXT("%.1f"), FeelComponent->FeelConfig.MaxLateralLeanRollDeg));
+        AddRow(OutRows, TEXT("Feel ImpactScale"), FString::Printf(TEXT("%.2f"), FeelComponent->FeelConfig.ImpactPulseScale));
+    }
+}
+
+void UCaddyVehicleDebugPanelProvider::GatherFeelRows(TArray<FDebugFrameworkPanelRow>& OutRows) const
+{
+    const ACaddyVehiclePawn* Pawn = VehiclePawn.Get();
+    const UCaddyVehicleFeelComponent* FeelComponent = Pawn ? Pawn->GetVehicleFeelComponent() : nullptr;
+    if (!Pawn || !FeelComponent)
+    {
+        AddRow(OutRows, TEXT("Status"), TEXT("Vehicle or feel component missing"), FLinearColor::Red);
+        return;
+    }
+
+    AddRow(OutRows, TEXT("Enabled"), BoolToOnOff(FeelComponent->FeelConfig.bEnableFeel));
+    AddRow(OutRows, TEXT("RigReady"), BoolToOnOff(FeelComponent->IsFeelRigReady()));
+    AddRow(OutRows, TEXT("IdleStrength"), FString::Printf(TEXT("%.2f"), FeelComponent->GetCurrentIdleStrength()));
+    AddRow(OutRows, TEXT("AccelAlpha"), FString::Printf(TEXT("%.2f"), FeelComponent->GetCurrentForwardAccelAlpha()));
+    AddRow(OutRows, TEXT("SpeedStretch"), FString::Printf(TEXT("%.2f"), FeelComponent->GetCurrentSpeedStretchAlpha()));
+    AddRow(OutRows, TEXT("LeanRollDeg"), FString::Printf(TEXT("%.2f"), FeelComponent->GetCurrentLeanRollDeg()));
+    AddRow(OutRows, TEXT("ImpactStrength"), FString::Printf(TEXT("%.2f"), FeelComponent->GetCurrentImpactStrength()));
+
+    const FVector Offset = FeelComponent->GetCurrentLocationOffset();
+    const FRotator RotationOffset = FeelComponent->GetCurrentRotationOffset();
+    const FVector ScaleMultiplier = FeelComponent->GetCurrentScaleMultiplier();
+    AddRow(OutRows, TEXT("LocOffset"), FString::Printf(TEXT("(%.2f, %.2f, %.2f)"), Offset.X, Offset.Y, Offset.Z));
+    AddRow(OutRows, TEXT("RotOffset"), FString::Printf(TEXT("(%.2f, %.2f, %.2f)"), RotationOffset.Pitch, RotationOffset.Yaw, RotationOffset.Roll));
+    AddRow(OutRows, TEXT("ScaleMult"), FString::Printf(TEXT("(%.3f, %.3f, %.3f)"), ScaleMultiplier.X, ScaleMultiplier.Y, ScaleMultiplier.Z));
+
+    AddRow(OutRows, TEXT("Cfg IdleEnabled"), BoolToOnOff(FeelComponent->FeelConfig.bEnableIdleEngineShake));
+    AddRow(OutRows, TEXT("Cfg IdleMaxSpeed"), FString::Printf(TEXT("%.1f"), FeelComponent->FeelConfig.IdleShakeMaxSpeed));
+    AddRow(OutRows, TEXT("Cfg IdleLocAmp"), FString::Printf(TEXT("%.2f"), FeelComponent->FeelConfig.IdleShakeLocationAmplitude));
+    AddRow(OutRows, TEXT("Cfg IdleRotAmp"), FString::Printf(TEXT("%.2f"), FeelComponent->FeelConfig.IdleShakeRotationAmplitudeDeg));
+    AddRow(OutRows, TEXT("Cfg IdleFreq"), FString::Printf(TEXT("%.2f"), FeelComponent->FeelConfig.IdleShakeFrequency));
+    AddRow(OutRows, TEXT("Cfg MaxAccelDeform"), FString::Printf(TEXT("%.1f"), FeelComponent->FeelConfig.MaxAccelSquashStretch));
+    AddRow(OutRows, TEXT("Cfg MaxSpeedStretch"), FString::Printf(TEXT("%.2f"), FeelComponent->FeelConfig.MaxSpeedStretch));
+    AddRow(OutRows, TEXT("Cfg MaxLeanRoll"), FString::Printf(TEXT("%.1f"), FeelComponent->FeelConfig.MaxLateralLeanRollDeg));
+    AddRow(OutRows, TEXT("Cfg ImpactDuration"), FString::Printf(TEXT("%.2f"), FeelComponent->FeelConfig.ImpactPulseDuration));
+    AddRow(OutRows, TEXT("Cfg ImpactScale"), FString::Printf(TEXT("%.2f"), FeelComponent->FeelConfig.ImpactPulseScale));
+    AddRow(OutRows, TEXT("Cfg ImpactKick"), FString::Printf(TEXT("%.1f"), FeelComponent->FeelConfig.ImpactPulseLocationKick));
 }
 
 void UCaddyVehicleDebugPanelProvider::GatherCameraRows(TArray<FDebugFrameworkPanelRow>& OutRows) const

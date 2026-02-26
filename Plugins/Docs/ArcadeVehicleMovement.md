@@ -22,7 +22,7 @@
   - Keeps throttle independent from move intent.
   - Exposes `IAbilitySystemInterface` with built-in `UAbilitySystemComponent`.
   - Sends input to server through lightweight RPC for future online play.
-  - Registers vehicle debug providers into DebugFramework (`Vehicle` tool with `Core/Input/Tuning/Camera/Collision/Debug Draw` panels).
+  - Registers vehicle debug providers into DebugFramework (`Vehicle` tool with `Core/Input/Tuning/Feel/Camera/Collision/Debug Draw` panels).
   - Supports runtime tuning preset list and switching via console commands.
 - `UCaddyVehicleCameraComponent`
   - Camera management layer that wraps built-in spring-arm/camera features.
@@ -30,6 +30,11 @@
   - Applies look-ahead offset and lateral roll from movement telemetry.
   - Dynamically tunes camera lag/rotation lag to enhance speed feeling.
   - Sources parameters from `UCaddyVehicleTuningDataAsset::CameraConfig`.
+- `UCaddyVehicleFeelComponent`
+  - Game-feel layer for visual motion/deformation on the vehicle mesh.
+  - Applies idle engine shake, acceleration squash/stretch, lateral lean, and collision pulse.
+  - Works on mesh relative transform/scale now, designed to be replaced by morph/deformer drivers later.
+  - Sources parameters from `UCaddyVehicleTuningDataAsset::FeelConfig`.
 - `ACaddyGameMode`
   - Sets default pawn and player controller.
 - `ACaddyPlayerController`
@@ -99,6 +104,17 @@
 - Data-driven tuning:
   - all camera parameters are in `FCaddyVehicleCameraConfig` on each tuning data asset.
   - preset switch immediately updates movement + camera style together.
+
+## Vehicle Feel Foundation (Phase 1)
+- `UCaddyVehicleFeelComponent` is added as an isolated runtime module.
+- Current implementation targets static mesh (cube) and supports:
+  - idle shake (location/rotation micro-motion)
+  - acceleration deformation (forward stretch + side squash)
+  - corner lean (roll by lateral speed)
+  - collision pulse (kick + squash burst on impact)
+- Why this path:
+  - fast iteration for prototype game feel.
+  - future replacement path is clear: keep high-level config/telemetry in feel component and swap only the output driver (e.g. morph targets, deformer graph, control rig).
 
 ## Multiplayer Notes
 - Current movement simulation runs on authority only.
