@@ -15,6 +15,7 @@
 #include "HAL/IConsoleManager.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Vehicle/ArcadeVehicleMovementComponent.h"
+#include "Vehicle/CaddyVehicleCameraComponent.h"
 #include "Vehicle/CaddyVehicleTuningDataAsset.h"
 
 namespace CaddyInputNames
@@ -190,6 +191,9 @@ ACaddyVehiclePawn::ACaddyVehiclePawn()
     VehicleMovementComponent = CreateDefaultSubobject<UArcadeVehicleMovementComponent>(TEXT("VehicleMovementComponent"));
     VehicleMovementComponent->SetUpdatedComponent(CollisionComponent);
 
+    VehicleCameraComponent = CreateDefaultSubobject<UCaddyVehicleCameraComponent>(TEXT("VehicleCameraComponent"));
+    VehicleCameraComponent->BindCameraRig(VehicleMovementComponent, CameraBoomComponent, TopDownCameraComponent);
+
     AbilitySystemComponent = CreateDefaultSubobject<UAbilitySystemComponent>(TEXT("AbilitySystemComponent"));
     AbilitySystemComponent->SetIsReplicated(true);
 }
@@ -197,6 +201,11 @@ ACaddyVehiclePawn::ACaddyVehiclePawn()
 void ACaddyVehiclePawn::BeginPlay()
 {
     Super::BeginPlay();
+
+    if (VehicleCameraComponent)
+    {
+        VehicleCameraComponent->BindCameraRig(VehicleMovementComponent, CameraBoomComponent, TopDownCameraComponent);
+    }
 
     if (RuntimeTuningPresets.Num() > 0)
     {
@@ -329,6 +338,10 @@ bool ACaddyVehiclePawn::ApplyRuntimeTuningPresetByIndex(int32 InIndex)
     }
 
     VehicleMovementComponent->SetTuningDataAsset(TargetPreset, true);
+    if (VehicleCameraComponent)
+    {
+        VehicleCameraComponent->SetCameraConfig(TargetPreset->CameraConfig, false);
+    }
     ActiveRuntimeTuningPresetIndex = InIndex;
 
     if (!HasAuthority())
@@ -500,8 +513,9 @@ void ACaddyVehiclePawn::RegisterDebugProviders()
     AddProvider(TEXT("Vehicle.Core"), NSLOCTEXT("CaddyVehicleDebug", "CorePanelTitle", "Core"), 10, ECaddyVehicleDebugPanelType::Core);
     AddProvider(TEXT("Vehicle.Input"), NSLOCTEXT("CaddyVehicleDebug", "InputPanelTitle", "Input"), 20, ECaddyVehicleDebugPanelType::Input);
     AddProvider(TEXT("Vehicle.Tuning"), NSLOCTEXT("CaddyVehicleDebug", "TuningPanelTitle", "Tuning"), 30, ECaddyVehicleDebugPanelType::Tuning);
-    AddProvider(TEXT("Vehicle.Collision"), NSLOCTEXT("CaddyVehicleDebug", "CollisionPanelTitle", "Collision"), 40, ECaddyVehicleDebugPanelType::Collision);
-    AddProvider(TEXT("Vehicle.DebugDraw"), NSLOCTEXT("CaddyVehicleDebug", "DebugDrawPanelTitle", "Debug Draw"), 50, ECaddyVehicleDebugPanelType::DebugDraw);
+    AddProvider(TEXT("Vehicle.Camera"), NSLOCTEXT("CaddyVehicleDebug", "CameraPanelTitle", "Camera"), 40, ECaddyVehicleDebugPanelType::Camera);
+    AddProvider(TEXT("Vehicle.Collision"), NSLOCTEXT("CaddyVehicleDebug", "CollisionPanelTitle", "Collision"), 50, ECaddyVehicleDebugPanelType::Collision);
+    AddProvider(TEXT("Vehicle.DebugDraw"), NSLOCTEXT("CaddyVehicleDebug", "DebugDrawPanelTitle", "Debug Draw"), 60, ECaddyVehicleDebugPanelType::DebugDraw);
 }
 
 void ACaddyVehiclePawn::UnregisterDebugProviders()

@@ -2,6 +2,7 @@
 
 #include "HitRegister/HitRegisterPipeline.h"
 #include "Vehicle/ArcadeVehicleMovementComponent.h"
+#include "Vehicle/CaddyVehicleCameraComponent.h"
 #include "Vehicle/CaddyVehiclePawn.h"
 #include "Vehicle/CaddyVehicleTuningDataAsset.h"
 
@@ -88,6 +89,9 @@ void UCaddyVehicleDebugPanelProvider::GatherDebugRows_Implementation(TArray<FDeb
         break;
     case ECaddyVehicleDebugPanelType::Tuning:
         GatherTuningRows(OutRows);
+        break;
+    case ECaddyVehicleDebugPanelType::Camera:
+        GatherCameraRows(OutRows);
         break;
     case ECaddyVehicleDebugPanelType::Collision:
         GatherCollisionRows(OutRows);
@@ -196,6 +200,44 @@ void UCaddyVehicleDebugPanelProvider::GatherTuningRows(TArray<FDebugFrameworkPan
     AddRow(OutRows, TEXT("WallGlideMinNormal"), FString::Printf(TEXT("%.1f"), MovementComponent->CollisionConfig.MinNormalImpactSpeedForGlide));
     AddRow(OutRows, TEXT("WallGlideMinSpeed"), FString::Printf(TEXT("%.1f"), MovementComponent->CollisionConfig.MinWallGlideSpeed));
     AddRow(OutRows, TEXT("PushOutDistance"), FString::Printf(TEXT("%.1f"), MovementComponent->CollisionConfig.PushOutDistance));
+    if (const UCaddyVehicleCameraComponent* CameraComponent = Pawn->GetVehicleCameraComponent())
+    {
+        AddRow(OutRows, TEXT("Cam BaseArmLen"), FString::Printf(TEXT("%.1f"), CameraComponent->CameraConfig.BaseArmLength));
+        AddRow(OutRows, TEXT("Cam BasePitch"), FString::Printf(TEXT("%.1f"), CameraComponent->CameraConfig.BasePitchDeg));
+        AddRow(OutRows, TEXT("Cam BaseFOV"), FString::Printf(TEXT("%.1f"), CameraComponent->CameraConfig.BaseFOV));
+    }
+}
+
+void UCaddyVehicleDebugPanelProvider::GatherCameraRows(TArray<FDebugFrameworkPanelRow>& OutRows) const
+{
+    const ACaddyVehiclePawn* Pawn = VehiclePawn.Get();
+    const UCaddyVehicleCameraComponent* CameraComponent = Pawn ? Pawn->GetVehicleCameraComponent() : nullptr;
+    if (!Pawn || !CameraComponent)
+    {
+        AddRow(OutRows, TEXT("Status"), TEXT("Vehicle or camera component missing"), FLinearColor::Red);
+        return;
+    }
+
+    AddRow(OutRows, TEXT("DynamicCamera"), BoolToOnOff(CameraComponent->CameraConfig.bEnableDynamicCamera));
+    AddRow(OutRows, TEXT("RigReady"), BoolToOnOff(CameraComponent->IsCameraRigReady()));
+    AddRow(OutRows, TEXT("SpeedAlpha"), FString::Printf(TEXT("%.2f"), CameraComponent->GetCurrentSpeedAlpha()));
+    AddRow(OutRows, TEXT("ArmLength"), FString::Printf(TEXT("%.1f"), CameraComponent->GetCurrentArmLength()));
+    AddRow(OutRows, TEXT("PitchDeg"), FString::Printf(TEXT("%.1f"), CameraComponent->GetCurrentPitchDeg()));
+    AddRow(OutRows, TEXT("FOV"), FString::Printf(TEXT("%.1f"), CameraComponent->GetCurrentFOV()));
+    AddRow(OutRows, TEXT("RollDeg"), FString::Printf(TEXT("%.2f"), CameraComponent->GetCurrentRollDeg()));
+    AddRow(OutRows, TEXT("LagSpeed"), FString::Printf(TEXT("%.2f"), CameraComponent->GetCurrentCameraLagSpeed()));
+
+    const FVector Offset = CameraComponent->GetCurrentWorldTargetOffset();
+    AddRow(OutRows, TEXT("WorldOffset"), FString::Printf(TEXT("(%.1f, %.1f, %.1f)"), Offset.X, Offset.Y, Offset.Z));
+
+    AddRow(OutRows, TEXT("Cfg BaseArmLen"), FString::Printf(TEXT("%.1f"), CameraComponent->CameraConfig.BaseArmLength));
+    AddRow(OutRows, TEXT("Cfg BasePitch"), FString::Printf(TEXT("%.1f"), CameraComponent->CameraConfig.BasePitchDeg));
+    AddRow(OutRows, TEXT("Cfg BaseFOV"), FString::Printf(TEXT("%.1f"), CameraComponent->CameraConfig.BaseFOV));
+    AddRow(OutRows, TEXT("Cfg MaxPitchOff"), FString::Printf(TEXT("%.1f"), CameraComponent->CameraConfig.MaxSpeedPitchOffsetDeg));
+    AddRow(OutRows, TEXT("Cfg MaxArmOff"), FString::Printf(TEXT("%.1f"), CameraComponent->CameraConfig.MaxSpeedArmLengthOffset));
+    AddRow(OutRows, TEXT("Cfg MaxFOVOff"), FString::Printf(TEXT("%.1f"), CameraComponent->CameraConfig.MaxSpeedFOVOffset));
+    AddRow(OutRows, TEXT("Cfg LookAhead"), FString::Printf(TEXT("%.1f"), CameraComponent->CameraConfig.LookAheadDistance));
+    AddRow(OutRows, TEXT("Cfg MaxRoll"), FString::Printf(TEXT("%.1f"), CameraComponent->CameraConfig.MaxLateralRollDeg));
 }
 
 void UCaddyVehicleDebugPanelProvider::GatherCollisionRows(TArray<FDebugFrameworkPanelRow>& OutRows) const

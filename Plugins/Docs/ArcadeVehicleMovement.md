@@ -17,13 +17,19 @@
   - Emits collision events into HitRegister pipeline for centralized event gating.
   - Draws vehicle debug vectors (forward/target/velocity/lateral) in world.
 - `ACaddyVehiclePawn`
-  - Owns collision, mesh, spring arm, top-down camera, movement component.
+  - Owns collision, mesh, spring arm, top-down camera, movement component, camera manager component.
   - Converts player 2D input into world-space move intent.
   - Keeps throttle independent from move intent.
   - Exposes `IAbilitySystemInterface` with built-in `UAbilitySystemComponent`.
   - Sends input to server through lightweight RPC for future online play.
-  - Registers vehicle debug providers into DebugFramework (`Vehicle` tool with `Core/Input/Tuning/Collision/Debug Draw` panels).
+  - Registers vehicle debug providers into DebugFramework (`Vehicle` tool with `Core/Input/Tuning/Camera/Collision/Debug Draw` panels).
   - Supports runtime tuning preset list and switching via console commands.
+- `UCaddyVehicleCameraComponent`
+  - Camera management layer that wraps built-in spring-arm/camera features.
+  - Drives speed-based pitch/arm/FOV offsets.
+  - Applies look-ahead offset and lateral roll from movement telemetry.
+  - Dynamically tunes camera lag/rotation lag to enhance speed feeling.
+  - Sources parameters from `UCaddyVehicleTuningDataAsset::CameraConfig`.
 - `ACaddyGameMode`
   - Sets default pawn and player controller.
 - `ACaddyPlayerController`
@@ -78,6 +84,21 @@
 - Pipeline source:
   - uses `CollisionHitRegisterPipeline` from current tuning data asset (applied onto movement component)
   - otherwise falls back to `HitRegisterSettings.DefaultPipeline`
+
+## Camera Management (Phase 1)
+- Current approach:
+  - Keep UE built-in camera stack (`USpringArmComponent + UCameraComponent`).
+  - Add `UCaddyVehicleCameraComponent` as orchestration layer for tuning and runtime adaptation.
+- Runtime camera effects:
+  - speed tilt (`BasePitch + MaxSpeedPitchOffsetDeg`)
+  - speed zoom-out (`BaseArmLength + MaxSpeedArmLengthOffset`)
+  - speed FOV boost (`BaseFOV + MaxSpeedFOVOffset`)
+  - velocity/move-intent look-ahead (`BaseWorldTargetOffset + Direction * LookAheadDistance`)
+  - lateral roll from slip (`LateralSpeed -> MaxLateralRollDeg`)
+  - speed-adaptive lag (`CameraLagSpeedAtLowSpeed -> CameraLagSpeedAtHighSpeed`)
+- Data-driven tuning:
+  - all camera parameters are in `FCaddyVehicleCameraConfig` on each tuning data asset.
+  - preset switch immediately updates movement + camera style together.
 
 ## Multiplayer Notes
 - Current movement simulation runs on authority only.

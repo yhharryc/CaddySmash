@@ -6,6 +6,7 @@
 #include "CaddyVehiclePawn.generated.h"
 
 class UAbilitySystemComponent;
+class UCaddyVehicleCameraComponent;
 class UArcadeVehicleMovementComponent;
 class UCaddyVehicleDebugPanelProvider;
 class UCaddyVehicleTuningDataAsset;
@@ -48,6 +49,9 @@ public:
     UFUNCTION(BlueprintPure, Category="Vehicle|Components")
     UArcadeVehicleMovementComponent* GetVehicleMovementComponent() const { return VehicleMovementComponent; }
 
+    UFUNCTION(BlueprintPure, Category="Vehicle|Components")
+    UCaddyVehicleCameraComponent* GetVehicleCameraComponent() const { return VehicleCameraComponent; }
+
     UFUNCTION(BlueprintCallable, Category="Vehicle|Config")
     bool ApplyRuntimeTuningPresetByIndex(int32 InIndex);
 
@@ -78,6 +82,9 @@ protected:
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Vehicle|Components")
     TObjectPtr<UArcadeVehicleMovementComponent> VehicleMovementComponent;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Vehicle|Components")
+    TObjectPtr<UCaddyVehicleCameraComponent> VehicleCameraComponent;
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Vehicle|Ability")
     TObjectPtr<UAbilitySystemComponent> AbilitySystemComponent;
