@@ -13,67 +13,67 @@ struct FCaddyVehicleCameraConfig
 {
     GENERATED_BODY()
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Camera")
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Camera", meta=(ToolTip="Master switch for runtime dynamic camera updates."))
     bool bEnableDynamicCamera = true;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Camera", meta=(ClampMin="200.0"))
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Camera", meta=(ClampMin="200.0", ToolTip="Base spring-arm length in cm before dynamic offsets are applied."))
     float BaseArmLength = 1400.0f;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Camera", meta=(ClampMin="-89.0", ClampMax="0.0"))
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Camera", meta=(ClampMin="-89.0", ClampMax="0.0", ToolTip="Base spring-arm pitch in degrees."))
     float BasePitchDeg = -72.0f;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Camera", meta=(ClampMin="30.0", ClampMax="170.0"))
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Camera", meta=(ClampMin="30.0", ClampMax="170.0", ToolTip="Base camera field of view in degrees before speed effects."))
     float BaseFOV = 90.0f;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Camera")
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Camera", meta=(ToolTip="Base world-space look-at offset applied to the spring-arm target."))
     FVector BaseWorldTargetOffset = FVector::ZeroVector;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Camera|Speed", meta=(ClampMin="1.0"))
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Camera|Speed", meta=(ClampMin="1.0", ToolTip="Vehicle speed that maps to full speed-based camera effects (alpha = 1)."))
     float MaxSpeedForEffects = 2200.0f;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Camera|Speed")
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Camera|Speed", meta=(ToolTip="Pitch offset added at max speed alpha, in degrees."))
     float MaxSpeedPitchOffsetDeg = 6.5f;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Camera|Speed")
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Camera|Speed", meta=(ToolTip="Additional arm length applied at max speed alpha, in cm."))
     float MaxSpeedArmLengthOffset = 120.0f;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Camera|Speed")
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Camera|Speed", meta=(ToolTip="Additional FOV applied at max speed alpha, in degrees."))
     float MaxSpeedFOVOffset = 8.0f;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Camera|LookAhead", meta=(ClampMin="0.0"))
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Camera|LookAhead", meta=(ClampMin="0.0", ToolTip="Distance in cm for look-ahead target offset along movement/intent direction."))
     float LookAheadDistance = 180.0f;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Camera|LookAhead", meta=(ClampMin="0.0"))
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Camera|LookAhead", meta=(ClampMin="0.0", ToolTip="Interpolation speed for look-ahead target offset."))
     float LookAheadInterpSpeed = 4.0f;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Camera|Roll", meta=(ClampMin="0.0"))
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Camera|Roll", meta=(ClampMin="0.0", ToolTip="Maximum camera roll from lateral motion, in degrees."))
     float MaxLateralRollDeg = 7.5f;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Camera|Roll", meta=(ClampMin="1.0"))
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Camera|Roll", meta=(ClampMin="1.0", ToolTip="Lateral speed in cm/s that maps to full camera roll magnitude."))
     float LateralSpeedForMaxRoll = 900.0f;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Camera|Roll", meta=(ClampMin="0.0"))
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Camera|Roll", meta=(ClampMin="0.0", ToolTip="Interpolation speed for roll changes."))
     float RollInterpSpeed = 6.0f;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Camera|Lag")
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Camera|Lag", meta=(ToolTip="Enables spring-arm position lag."))
     bool bEnableCameraLag = true;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Camera|Lag", meta=(ClampMin="0.0"))
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Camera|Lag", meta=(ClampMin="0.0", ToolTip="Camera lag speed when the vehicle is near zero speed. Higher values reduce lag."))
     float CameraLagSpeedAtLowSpeed = 12.0f;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Camera|Lag", meta=(ClampMin="0.0"))
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Camera|Lag", meta=(ClampMin="0.0", ToolTip="Camera lag speed at max speed alpha. Higher values reduce lag."))
     float CameraLagSpeedAtHighSpeed = 7.0f;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Camera|Lag", meta=(ClampMin="0.0"))
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Camera|Lag", meta=(ClampMin="0.0", ToolTip="Maximum allowed lag distance in cm for spring-arm position lag."))
     float CameraLagMaxDistance = 340.0f;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Camera|Lag")
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Camera|Lag", meta=(ToolTip="Enables spring-arm rotation lag."))
     bool bEnableCameraRotationLag = true;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Camera|Lag", meta=(ClampMin="0.0"))
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Camera|Lag", meta=(ClampMin="0.0", ToolTip="Rotation lag speed for spring-arm orientation. Higher values track faster."))
     float CameraRotationLagSpeed = 12.0f;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Camera|Smoothing", meta=(ClampMin="0.0"))
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Camera|Smoothing", meta=(ClampMin="0.0", ToolTip="Interpolation speed for dynamic camera transform targets."))
     float TransformInterpSpeed = 4.0f;
 };
 

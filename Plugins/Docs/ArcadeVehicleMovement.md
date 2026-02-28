@@ -130,3 +130,6 @@
 - `caddy.vehicle.tuning.next`
 - `caddy.vehicle.tuning.prev`
 - `caddy.vehicle.tuning.set <index>`
+
+## Detailed Parameter Reference
+- `Plugins/Docs/VehicleTuningParameterReference.md`
