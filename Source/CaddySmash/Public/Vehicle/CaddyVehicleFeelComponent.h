@@ -12,73 +12,73 @@ struct FCaddyVehicleFeelConfig
 {
     GENERATED_BODY()
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Feel")
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Feel", meta=(ToolTip="Master switch for the runtime vehicle feel effects layer."))
     bool bEnableFeel = true;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Feel|Idle")
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Feel|Idle", meta=(ToolTip="Enables subtle idle engine shake offsets."))
     bool bEnableIdleEngineShake = true;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Feel|Idle", meta=(ClampMin="0.0"))
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Feel|Idle", meta=(ClampMin="0.0", ToolTip="Idle shake fades out above this forward speed, in cm/s."))
     float IdleShakeMaxSpeed = 220.0f;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Feel|Idle", meta=(ClampMin="0.0"))
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Feel|Idle", meta=(ClampMin="0.0", ToolTip="Maximum translational shake amplitude in cm at full idle strength."))
     float IdleShakeLocationAmplitude = 2.4f;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Feel|Idle", meta=(ClampMin="0.0"))
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Feel|Idle", meta=(ClampMin="0.0", ToolTip="Maximum rotational shake amplitude in degrees at full idle strength."))
     float IdleShakeRotationAmplitudeDeg = 1.2f;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Feel|Idle", meta=(ClampMin="0.0"))
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Feel|Idle", meta=(ClampMin="0.0", ToolTip="Oscillation frequency of idle shake, in Hz."))
     float IdleShakeFrequency = 9.0f;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Feel|Idle", meta=(ClampMin="0.0"))
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Feel|Idle", meta=(ClampMin="0.0", ToolTip="Extra idle shake multiplier added when throttle/brake input is active."))
     float IdleInputBoost = 0.7f;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Feel|Deform")
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Feel|Deform", meta=(ToolTip="Enables acceleration-driven squash/stretch deformation."))
     bool bEnableAccelerationDeform = true;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Feel|Deform", meta=(ClampMin="1.0"))
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Feel|Deform", meta=(ClampMin="1.0", ToolTip="Forward acceleration magnitude that maps to full deform strength, in cm/s^2."))
     float MaxForwardAccelForDeform = 9000.0f;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Feel|Deform", meta=(ClampMin="0.0", ClampMax="0.5"))
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Feel|Deform", meta=(ClampMin="0.0", ClampMax="0.5", ToolTip="Maximum acceleration-based squash/stretch scale delta."))
     float MaxAccelSquashStretch = 0.07f;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Feel|Deform", meta=(ClampMin="0.0", ClampMax="0.5"))
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Feel|Deform", meta=(ClampMin="0.0", ClampMax="0.5", ToolTip="Maximum additional forward stretch based on current speed."))
     float MaxSpeedStretch = 0.03f;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Feel|Deform", meta=(ClampMin="1.0"))
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Feel|Deform", meta=(ClampMin="1.0", ToolTip="Forward speed in cm/s that maps to full speed-based stretch."))
     float MaxSpeedForStretch = 2200.0f;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Feel|Lean")
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Feel|Lean", meta=(ToolTip="Enables lateral lean roll based on slip/cornering speed."))
     bool bEnableLateralLean = true;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Feel|Lean", meta=(ClampMin="1.0"))
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Feel|Lean", meta=(ClampMin="1.0", ToolTip="Lateral speed in cm/s that maps to full lean roll."))
     float LateralSpeedForMaxLean = 1000.0f;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Feel|Lean", meta=(ClampMin="0.0"))
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Feel|Lean", meta=(ClampMin="0.0", ToolTip="Maximum roll angle for lateral lean, in degrees."))
     float MaxLateralLeanRollDeg = 7.0f;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Feel|Impact")
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Feel|Impact", meta=(ToolTip="Enables one-shot impact pulse on recent blocking collisions."))
     bool bEnableImpactPulse = true;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Feel|Impact", meta=(ClampMin="0.01"))
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Feel|Impact", meta=(ClampMin="0.01", ToolTip="Duration of each impact pulse effect, in seconds."))
     float ImpactPulseDuration = 0.28f;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Feel|Impact", meta=(ClampMin="1.0"))
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Feel|Impact", meta=(ClampMin="1.0", ToolTip="Normal impact speed in cm/s that maps to full impact pulse strength."))
     float ImpactNormalSpeedForMaxPulse = 1200.0f;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Feel|Impact", meta=(ClampMin="0.0"))
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Feel|Impact", meta=(ClampMin="0.0", ToolTip="Scale burst amount applied by impact pulse."))
     float ImpactPulseScale = 0.10f;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Feel|Impact", meta=(ClampMin="0.0"))
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Feel|Impact", meta=(ClampMin="0.0", ToolTip="Location kick distance in cm applied opposite to impact normal."))
     float ImpactPulseLocationKick = 7.5f;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Feel|Impact", meta=(ClampMin="0.0"))
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Feel|Impact", meta=(ClampMin="0.0", ToolTip="Rotational kick magnitude in degrees applied by impact pulse."))
     float ImpactPulseRotationKickDeg = 4.0f;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Feel|Smoothing", meta=(ClampMin="0.0"))
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Feel|Smoothing", meta=(ClampMin="0.0", ToolTip="Interpolation speed for location/rotation feel offsets."))
     float OffsetInterpSpeed = 8.0f;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Feel|Smoothing", meta=(ClampMin="0.0"))
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Feel|Smoothing", meta=(ClampMin="0.0", ToolTip="Interpolation speed for scale changes caused by feel effects."))
     float ScaleInterpSpeed = 10.0f;
 };
 

@@ -127,33 +127,4 @@ Units are Unreal default (`cm`, `cm/s`, `cm/s^2`, `degrees`, `seconds`) unless s
 | `ImpactPulseRotationKickDeg` | Rotational kick magnitude on impact. | More angular hit snap. | Less rotational disturbance. | Add “slam” energy to collisions. |
 | `OffsetInterpSpeed` | Interp speed for offset/rotation channels. | Faster response, less smoothing. | Smoother, floatier transitions. | Balance responsiveness and jitter. |
 | `ScaleInterpSpeed` | Interp speed for scale channel. | Faster scale snaps. | Softer scale transitions. | Control deformation sharpness. |
-| `MorphConfig` | Morph target output mapping for feel signals. | N/A | N/A | Enable mesh-shape driven feel on skeletal vehicles. |
 
-## Feel Morph Core (`FCaddyVehicleMorphConfig`)
-
-| Parameter | Meaning | Increase | Decrease | Typical Use |
-| --- | --- | --- | --- | --- |
-| `bEnableMorphTargets` | Master switch for morph output. | N/A | N/A | Turn on only for skeletal mesh based vehicles. |
-| `bApplyTransformFeelAlongsideMorph` | Whether transform feel and morph feel run together. | More layered/exaggerated feel. | Cleaner morph-only output. | Use `true` while migrating from cube prototype. |
-| `bWarnMissingMorphTargets` | Logs warning once per missing morph name. | More diagnostics. | Less log noise. | Keep on during setup, off for shipping noise control. |
-| `GlobalWeightScale` | Global multiplier applied to all channel outputs. | Stronger overall morph effect. | Softer overall morph effect. | Quick global intensity knob per vehicle. |
-| `IdleChannel` | Channel mapping from idle signal (0..1). | N/A | N/A | Engine rumble shape morph. |
-| `AccelerationChannel` | Channel mapping from accel signal (0..1). | N/A | N/A | Launch squash/stretch shape. |
-| `SpeedChannel` | Channel mapping from speed signal (0..1). | N/A | N/A | High-speed elongation shape. |
-| `LeanLeftChannel` | Channel mapping from left lean signal (0..1). | N/A | N/A | Corner lean to left side shape. |
-| `LeanRightChannel` | Channel mapping from right lean signal (0..1). | N/A | N/A | Corner lean to right side shape. |
-| `ImpactChannel` | Channel mapping from impact pulse signal (0..1). | N/A | N/A | One-shot collision shape pulse. |
-
-## Feel Morph Channel (`FCaddyVehicleMorphChannelConfig`)
-
-These fields are shared by each channel entry above.
-
-| Parameter | Meaning | Increase | Decrease | Typical Use |
-| --- | --- | --- | --- | --- |
-| `bEnabled` | Enables this specific channel mapping. | N/A | N/A | Toggle a channel without clearing the configured name. |
-| `MorphTargetName` | Morph target name to drive on skeletal mesh. | N/A | N/A | Bind channel to authored morph target. |
-| `InputScale` | Multiplier for source signal before clamp. | Stronger response to signal changes. | Weaker response to signal changes. | Fine control per channel intensity. |
-| `InputBias` | Constant added after scaling source signal. | Raises baseline weight. | Lowers baseline weight. | Keep slight deformation even at low signal. |
-| `OutputMin` | Minimum output after processing. | Higher floor value. | Lower floor value. | Avoid complete zeroing for subtle persistent shape. |
-| `OutputMax` | Maximum output after processing. | Higher peak allowance. | Lower peak cap. | Prevent over-deformation spikes. |
-| `InterpSpeed` | Smoothing speed of current weight toward target. | Faster/snappier morph updates. | Slower/smoother morph updates. | Remove jitter vs add responsiveness. |
