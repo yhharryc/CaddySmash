@@ -108,7 +108,7 @@
 ## Vehicle Feel Foundation (Phase 1)
 - `UCaddyVehicleFeelComponent` is added as an isolated runtime module.
 - Current implementation targets static mesh (cube) and supports:
-  - idle shake (location/rotation micro-motion)
+  - engine scale vibration (curve-driven variance/frequency)
   - acceleration deformation (forward stretch + side squash)
   - corner lean (roll by lateral speed)
   - collision pulse (kick + squash burst on impact)

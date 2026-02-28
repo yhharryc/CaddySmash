@@ -7,7 +7,7 @@
 - Phase 1 (implemented):
   - `UCaddyVehicleFeelComponent` drives mesh relative transform and scale.
   - Data-driven config via `FCaddyVehicleFeelConfig` on `UCaddyVehicleTuningDataAsset`.
-  - Runtime effects: idle shake, acceleration squash/stretch, lateral lean, impact pulse.
+  - Runtime effects: scale-only engine vibration (curve-driven variance/frequency), acceleration squash/stretch, lateral lean, impact pulse.
 - Phase 2 (planned):
   - Keep the same feel config + telemetry logic.
   - Replace output driver from "relative transform/scale" to:
@@ -23,7 +23,7 @@
 
 ## UE 5.7 Feature Recommendations
 - For subtle runtime jiggle on rigid meshes:
-  - keep transform-driven offsets (current approach), optionally mix with material WPO.
+  - use scale-only vibration first (current approach), optionally mix with material WPO.
 - For authored deformation on production cars:
   - morph target based squash/bend (if skeletal pipeline is available).
 - For richer procedural deformation:

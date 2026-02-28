@@ -46,7 +46,7 @@ Units are Unreal default (`cm`, `cm/s`, `cm/s^2`, `degrees`, `seconds`) unless s
 | `ResponseMode` | Collision response model (`SlideOnly`, `ArcadeWallGlide`). | N/A | N/A | Use `ArcadeWallGlide` for smooth arcade wall behavior. |
 | `SpeedRetainRatio` | Speed preserved after impact (0..1). | Keep momentum after hits. | Bigger speed loss on collision. | Higher for forgiving arcade flow. |
 | `MaxCollisionIterations` | Sweep/resolve loops per tick. | Better stability in corners/stacked contacts. | Cheaper but can feel stickier. | Increase if corner trapping occurs. |
-| `WallGlideVelocityInterpSpeed` | Blend speed toward glide tangent velocity. | Snappier redirection after wall contact. | Softer transition. | Avoid “frozen on wall” feeling. |
+| `WallGlideVelocityInterpSpeed` | Blend speed toward glide tangent velocity. | Snappier redirection after wall contact. | Softer transition. | Avoid “frozen on wall Efeeling. |
 | `WallGlideInputAssist` | Player input influence on wall glide direction. | More player control while scraping walls. | More physically neutral slide. | Keep agency during collisions. |
 | `MinNormalImpactSpeedForGlide` | Normal impact threshold for strong glide logic. | Fewer impacts trigger strong glide behavior. | More impacts trigger glide smoothing. | Control when arcade smoothing activates. |
 | `MinWallGlideSpeed` | Minimum preserved glide speed on heavy impact. | Fewer full stalls on wall hits. | Impacts can slow more aggressively. | Maintain race flow after mistakes. |
@@ -64,7 +64,7 @@ Units are Unreal default (`cm`, `cm/s`, `cm/s^2`, `degrees`, `seconds`) unless s
 | `MinNormalImpactSpeedForEvent` | Minimum normal impact speed to emit event. | Only stronger head-on hits trigger events. | More glancing hits can trigger. | Tune combat readability. |
 | `EventCooldownSeconds` | Per-vehicle cooldown between emitted events. | Fewer repeated spam events. | More frequent events in rapid hits. | Stabilize damage/event frequency. |
 | `BaseDamageByNormalImpactSpeed` | Damage slope vs normal impact speed. | Impact damage scales faster. | Impact damage scales slower. | Balance ramming builds. |
-| `BaseDamageBias` | Flat damage added to each emitted event. | Higher guaranteed damage floor. | More speed-dependent damage only. | Ensure collisions always “matter.” |
+| `BaseDamageBias` | Flat damage added to each emitted event. | Higher guaranteed damage floor. | More speed-dependent damage only. | Ensure collisions always “matter. E|
 | `BaseTags` | Tags always included in collision events. | N/A | N/A | Route logic in ability/effect systems. |
 | `WorldStaticTag` | Added when hitting static world. | N/A | N/A | Distinguish wall hits from actor hits. |
 | `WorldDynamicTag` | Added when hitting dynamic world objects. | N/A | N/A | Barrel/physics-object specific rules. |
@@ -92,7 +92,7 @@ Units are Unreal default (`cm`, `cm/s`, `cm/s^2`, `degrees`, `seconds`) unless s
 | `MaxLateralRollDeg` | Max camera roll from lateral slip. | Stronger cornering drama. | Flatter, calmer image. | Add arcade energy in turns. |
 | `LateralSpeedForMaxRoll` | Lateral speed needed for full roll. | Roll responds less at moderate slip. | Roll reaches max earlier. | Prevent over-roll on small corrections. |
 | `RollInterpSpeed` | Roll interpolation speed. | Faster roll reactions. | Slower, softer roll. | Tune comfort vs punchiness. |
-| `bEnableCameraLag` | Enables spring-arm location lag. | N/A | N/A | Core “weight” feel for speed. |
+| `bEnableCameraLag` | Enables spring-arm location lag. | N/A | N/A | Core “weight Efeel for speed. |
 | `CameraLagSpeedAtLowSpeed` | Lag speed near zero speed. | Camera catches up faster (less lag). | More low-speed float. | Keep idle maneuvering readable. |
 | `CameraLagSpeedAtHighSpeed` | Lag speed at high speed. | Camera catches up faster at speed. | More high-speed drag/weight. | Add speed weight without over-sway. |
 | `CameraLagMaxDistance` | Max allowed lag displacement. | Allows larger lag arcs. | Tighter follow behavior. | Control extreme lag artifacts. |
@@ -105,12 +105,20 @@ Units are Unreal default (`cm`, `cm/s`, `cm/s^2`, `degrees`, `seconds`) unless s
 | Parameter | Meaning | Increase | Decrease | Typical Use |
 | --- | --- | --- | --- | --- |
 | `bEnableFeel` | Master switch for feel output. | N/A | N/A | Disable for clean baseline tests. |
-| `bEnableIdleEngineShake` | Enables idle shake layer. | N/A | N/A | Add life when vehicle is still. |
-| `IdleShakeMaxSpeed` | Speed where idle shake fades out. | Idle shake remains active at higher speed. | Idle shake disappears earlier. | Keep shake mostly near standstill. |
-| `IdleShakeLocationAmplitude` | Max translational idle shake amplitude. | Stronger positional vibration. | Subtler vibration. | Engine rumble exaggeration. |
-| `IdleShakeRotationAmplitudeDeg` | Max rotational idle shake amplitude. | Stronger rotational wobble. | Subtler wobble. | Stylized idle personality. |
-| `IdleShakeFrequency` | Idle shake oscillation frequency. | Faster “buzz.” | Slower “rocking” shake. | Tune engine type fantasy. |
-| `IdleInputBoost` | Added shake strength from active input. | Input-driven shake is more obvious. | Less change when pressing controls. | Make throttle blips visible. |
+| `EngineScaleVibration` | Nested engine scale vibration profile. | N/A | N/A | Configure non-linear idle-to-cruise engine pulse behavior. |
+| `EngineScaleVibration.bEnableEngineScaleVibration` | Enables scale-only engine vibration. | N/A | N/A | Keep car alive at idle without location jitter. |
+| `EngineScaleVibration.BaseVariance` | Base size variance at low speed (engine running state). | Stronger idle pulse. | Softer idle pulse. | Set static idle personality. |
+| `EngineScaleVibration.BaseFrequencyHz` | Base pulse frequency at low speed. | Faster pulse. | Slower pulse. | Tune engine rhythm. |
+| `EngineScaleVibration.SpeedForCurveNormalization` | Speed mapped to curve X=1.0. | Curve transition stretches over larger speed range. | Transition happens earlier. | Align curve behavior to vehicle class speed. |
+| `EngineScaleVibration.VarianceBySpeedCurve` | Optional curve for variance multiplier by speed alpha. | Depends on curve shape. | Depends on curve shape. | Build non-linear rise-then-fall variance profile. |
+| `EngineScaleVibration.FrequencyBySpeedCurve` | Optional curve for frequency multiplier by speed alpha. | Depends on curve shape. | Depends on curve shape. | Build non-linear frequency profile. |
+| `EngineScaleVibration.ThrottleVarianceBoost` | Extra variance from active throttle/brake input. | Stronger pulse when player starts accelerating. | Less start-up punch. | Emphasize launch feel. |
+| `EngineScaleVibration.ThrottleFrequencyBoostHz` | Extra frequency from active throttle/brake input. | Faster pulse during input. | Smaller frequency reaction. | Add urgency on acceleration onset. |
+| `EngineScaleVibration.VarianceInterpSpeed` | Smoothing speed for variance changes. | More responsive variance changes. | Smoother transitions. | Reduce choppiness or add snappiness. |
+| `EngineScaleVibration.FrequencyInterpSpeed` | Smoothing speed for frequency changes. | More responsive frequency changes. | Smoother transitions. | Stabilize frequency movement. |
+| `EngineScaleVibration.MaxVariance` | Upper clamp for final variance. | Allows larger scale oscillation. | Caps pulse earlier. | Prevent over-exaggeration. |
+| `EngineScaleVibration.MinFrequencyHz` | Lower clamp for frequency. | Keeps minimum pulse rate higher. | Allows very slow pulse. | Ensure engine never feels fully dead. |
+| `EngineScaleVibration.MaxFrequencyHz` | Upper clamp for frequency. | Allows very rapid pulse at launch. | Restrains peak pulse speed. | Avoid noisy high-frequency vibration. |
 | `bEnableAccelerationDeform` | Enables accel/speed squash-stretch. | N/A | N/A | Turn off for realistic rigid body style. |
 | `MaxForwardAccelForDeform` | Accel needed for full deform alpha. | Requires harder accel to hit max effect. | Effect reaches max more easily. | Normalize across different accel profiles. |
 | `MaxAccelSquashStretch` | Max accel-driven scale deformation amount. | Stronger launch/compression effect. | Milder deformation. | Cartoon vs grounded style. |
@@ -124,7 +132,6 @@ Units are Unreal default (`cm`, `cm/s`, `cm/s^2`, `degrees`, `seconds`) unless s
 | `ImpactNormalSpeedForMaxPulse` | Impact speed needed for full pulse. | Only very strong hits reach max pulse. | Moderate hits can reach max pulse. | Prevent overreaction on small bumps. |
 | `ImpactPulseScale` | Scale burst amount during impact. | Stronger squash/pop on hit. | Softer hit deformation. | Communicate impact severity. |
 | `ImpactPulseLocationKick` | Positional kick distance from impact. | Stronger knockback illusion. | Smaller kick. | Improve tactile hit feel. |
-| `ImpactPulseRotationKickDeg` | Rotational kick magnitude on impact. | More angular hit snap. | Less rotational disturbance. | Add “slam” energy to collisions. |
+| `ImpactPulseRotationKickDeg` | Rotational kick magnitude on impact. | More angular hit snap. | Less rotational disturbance. | Add slam energy to collisions. |
 | `OffsetInterpSpeed` | Interp speed for offset/rotation channels. | Faster response, less smoothing. | Smoother, floatier transitions. | Balance responsiveness and jitter. |
 | `ScaleInterpSpeed` | Interp speed for scale channel. | Faster scale snaps. | Softer scale transitions. | Control deformation sharpness. |
-

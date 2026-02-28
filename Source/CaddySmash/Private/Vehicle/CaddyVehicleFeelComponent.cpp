@@ -1,6 +1,7 @@
 #include "Vehicle/CaddyVehicleFeelComponent.h"
 
 #include "Components/SceneComponent.h"
+#include "Curves/CurveFloat.h"
 #include "GameFramework/Pawn.h"
 #include "Vehicle/ArcadeVehicleMovementComponent.h"
 
@@ -74,10 +75,8 @@ void UCaddyVehicleFeelComponent::TickComponent(
         return;
     }
 
-    const float WorldTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f;
     const float ForwardSpeed = Movement->GetForwardSpeed();
     const float LateralSpeed = Movement->GetLateralSpeed();
-    const float PlanarSpeed = FVector2D(ForwardSpeed, LateralSpeed).Size();
 
     float ForwardAccel = 0.0f;
     if (bHasPreviousForwardSpeed)
@@ -115,29 +114,81 @@ void UCaddyVehicleFeelComponent::TickComponent(
         DeltaTime,
         FeelConfig.ScaleInterpSpeed);
 
-    float IdleStrengthTarget = 0.0f;
-    if (FeelConfig.bEnableIdleEngineShake && PlanarSpeed <= FeelConfig.IdleShakeMaxSpeed)
-    {
-        const float SpeedFactor = 1.0f - FMath::Clamp(
-            PlanarSpeed / FMath::Max(1.0f, FeelConfig.IdleShakeMaxSpeed),
-            0.0f,
-            1.0f);
-        const float InputAmount = FMath::Max(Movement->GetThrottleInput(), Movement->GetBrakeReverseInput());
-        IdleStrengthTarget = SpeedFactor * (0.4f + (InputAmount * FeelConfig.IdleInputBoost));
-    }
-    CurrentIdleStrength = FMath::FInterpTo(CurrentIdleStrength, IdleStrengthTarget, DeltaTime, FeelConfig.OffsetInterpSpeed);
+    const FCaddyVehicleEngineScaleVibrationConfig& EngineScale = FeelConfig.EngineScaleVibration;
+    const float TargetSpeedAlpha = FMath::Clamp(
+        FMath::Abs(ForwardSpeed) / FMath::Max(1.0f, EngineScale.SpeedForCurveNormalization),
+        0.0f,
+        1.0f);
+    CurrentEngineScaleSpeedAlpha = FMath::FInterpTo(
+        CurrentEngineScaleSpeedAlpha,
+        TargetSpeedAlpha,
+        DeltaTime,
+        FMath::Max(1.0f, EngineScale.FrequencyInterpSpeed));
 
-    const float IdleFrequency = FMath::Max(0.0f, FeelConfig.IdleShakeFrequency);
-    const float IdleLocationAmp = FeelConfig.IdleShakeLocationAmplitude * CurrentIdleStrength;
-    const float IdleRotationAmp = FeelConfig.IdleShakeRotationAmplitudeDeg * CurrentIdleStrength;
-    const FVector IdleLocationOffset(
-        FMath::Sin(WorldTime * IdleFrequency) * IdleLocationAmp,
-        FMath::Sin((WorldTime * IdleFrequency * 1.71f) + 1.3f) * IdleLocationAmp * 0.45f,
-        FMath::Sin((WorldTime * IdleFrequency * 2.37f) + 2.7f) * IdleLocationAmp * 0.72f);
-    const FRotator IdleRotationOffset(
-        FMath::Sin((WorldTime * IdleFrequency * 1.51f) + 0.2f) * IdleRotationAmp,
-        FMath::Sin((WorldTime * IdleFrequency * 0.91f) + 2.2f) * IdleRotationAmp * 0.6f,
-        FMath::Sin((WorldTime * IdleFrequency * 1.23f) + 1.1f) * IdleRotationAmp * 0.9f);
+    float VarianceTarget = 0.0f;
+    float FrequencyTargetHz = 0.0f;
+    float EngineStrengthTarget = 0.0f;
+    if (EngineScale.bEnableEngineScaleVibration)
+    {
+        const float VarianceMultiplier = EvaluateEngineCurveMultiplier(
+            EngineScale.VarianceBySpeedCurve,
+            CurrentEngineScaleSpeedAlpha,
+            1.45f,
+            0.62f);
+        const float FrequencyMultiplier = EvaluateEngineCurveMultiplier(
+            EngineScale.FrequencyBySpeedCurve,
+            CurrentEngineScaleSpeedAlpha,
+            1.60f,
+            0.58f);
+        const float InputAmount = FMath::Max(Movement->GetThrottleInput(), Movement->GetBrakeReverseInput());
+
+        VarianceTarget = (EngineScale.BaseVariance * VarianceMultiplier) + (InputAmount * EngineScale.ThrottleVarianceBoost);
+        VarianceTarget = FMath::Clamp(VarianceTarget, 0.0f, EngineScale.MaxVariance);
+
+        FrequencyTargetHz = (EngineScale.BaseFrequencyHz * FrequencyMultiplier) + (InputAmount * EngineScale.ThrottleFrequencyBoostHz);
+        FrequencyTargetHz = FMath::Clamp(FrequencyTargetHz, EngineScale.MinFrequencyHz, EngineScale.MaxFrequencyHz);
+
+        EngineStrengthTarget = VarianceMultiplier;
+    }
+
+    CurrentIdleStrength = FMath::FInterpTo(
+        CurrentIdleStrength,
+        EngineStrengthTarget,
+        DeltaTime,
+        FMath::Max(0.0f, EngineScale.VarianceInterpSpeed));
+    CurrentEngineScaleVariance = FMath::FInterpTo(
+        CurrentEngineScaleVariance,
+        VarianceTarget,
+        DeltaTime,
+        FMath::Max(0.0f, EngineScale.VarianceInterpSpeed));
+    CurrentEngineScaleFrequencyHz = FMath::FInterpTo(
+        CurrentEngineScaleFrequencyHz,
+        FrequencyTargetHz,
+        DeltaTime,
+        FMath::Max(0.0f, EngineScale.FrequencyInterpSpeed));
+
+    if (CurrentEngineScaleFrequencyHz > KINDA_SMALL_NUMBER)
+    {
+        constexpr float TwoPi = 6.2831853071795864769f;
+        EngineScaleOscillatorPhase = FMath::Fmod(
+            EngineScaleOscillatorPhase + (CurrentEngineScaleFrequencyHz * DeltaTime * TwoPi),
+            TwoPi);
+    }
+    else
+    {
+        EngineScaleOscillatorPhase = 0.0f;
+    }
+
+    if (EngineScale.bEnableEngineScaleVibration)
+    {
+        float Wave = FMath::Sin(EngineScaleOscillatorPhase);
+        Wave += 0.35f * FMath::Sin((EngineScaleOscillatorPhase * 2.17f) + 1.1f);
+        CurrentEngineScaleWave = FMath::Clamp(Wave / 1.35f, -1.0f, 1.0f);
+    }
+    else
+    {
+        CurrentEngineScaleWave = 0.0f;
+    }
 
     float LeanTarget = 0.0f;
     if (FeelConfig.bEnableLateralLean)
@@ -197,25 +248,26 @@ void UCaddyVehicleFeelComponent::TickComponent(
         ScaleTarget.Z += ImpactScale * 0.25f;
     }
 
+    const float EngineUniformScaleDelta = CurrentEngineScaleWave * CurrentEngineScaleVariance;
+    ScaleTarget *= (1.0f + EngineUniformScaleDelta);
+
     ScaleTarget.X = FMath::Max(0.5f, ScaleTarget.X);
     ScaleTarget.Y = FMath::Max(0.5f, ScaleTarget.Y);
     ScaleTarget.Z = FMath::Max(0.5f, ScaleTarget.Z);
 
-    const FVector ScaleInterp = FMath::VInterpTo(
+    CurrentScaleMultiplier = FMath::VInterpTo(
         CurrentScaleMultiplier,
         ScaleTarget,
         DeltaTime,
         FeelConfig.ScaleInterpSpeed);
-    CurrentScaleMultiplier = ScaleInterp;
 
-    const FVector LocationTarget = IdleLocationOffset + ImpactLocationOffset;
     CurrentLocationOffset = FMath::VInterpTo(
         CurrentLocationOffset,
-        LocationTarget,
+        ImpactLocationOffset,
         DeltaTime,
         FeelConfig.OffsetInterpSpeed);
 
-    FRotator RotationTarget = IdleRotationOffset + ImpactRotationOffset;
+    FRotator RotationTarget = ImpactRotationOffset;
     RotationTarget.Roll += CurrentLeanRollDeg;
     CurrentRotationOffset = FMath::RInterpTo(
         CurrentRotationOffset,
@@ -226,6 +278,28 @@ void UCaddyVehicleFeelComponent::TickComponent(
     Visual->SetRelativeLocation(BaseRelativeLocation + CurrentLocationOffset);
     Visual->SetRelativeRotation(BaseRelativeRotation + CurrentRotationOffset);
     Visual->SetRelativeScale3D(BaseRelativeScale * CurrentScaleMultiplier);
+}
+
+float UCaddyVehicleFeelComponent::EvaluateEngineCurveMultiplier(
+    const UCurveFloat* Curve,
+    const float SpeedAlpha,
+    const float FallbackPeakMultiplier,
+    const float FallbackCruiseMultiplier) const
+{
+    if (Curve)
+    {
+        return Curve->GetFloatValue(SpeedAlpha);
+    }
+
+    constexpr float PeakAlpha = 0.16f;
+    if (SpeedAlpha <= PeakAlpha)
+    {
+        const float T = FMath::Clamp(SpeedAlpha / PeakAlpha, 0.0f, 1.0f);
+        return FMath::InterpEaseInOut(1.0f, FallbackPeakMultiplier, T, 2.0f);
+    }
+
+    const float T = FMath::Clamp((SpeedAlpha - PeakAlpha) / (1.0f - PeakAlpha), 0.0f, 1.0f);
+    return FMath::InterpEaseInOut(FallbackPeakMultiplier, FallbackCruiseMultiplier, T, 2.3f);
 }
 
 void UCaddyVehicleFeelComponent::ResolveRigReferences()
@@ -307,6 +381,11 @@ void UCaddyVehicleFeelComponent::SnapToBaseTransform()
     }
 
     CurrentIdleStrength = 0.0f;
+    EngineScaleOscillatorPhase = 0.0f;
+    CurrentEngineScaleSpeedAlpha = 0.0f;
+    CurrentEngineScaleVariance = 0.0f;
+    CurrentEngineScaleFrequencyHz = 0.0f;
+    CurrentEngineScaleWave = 0.0f;
     CurrentForwardAccelAlpha = 0.0f;
     CurrentSpeedStretchAlpha = 0.0f;
     CurrentLeanRollDeg = 0.0f;

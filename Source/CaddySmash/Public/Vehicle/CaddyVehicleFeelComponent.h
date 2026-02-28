@@ -5,7 +5,53 @@
 #include "CaddyVehicleFeelComponent.generated.h"
 
 class UArcadeVehicleMovementComponent;
+class UCurveFloat;
 class USceneComponent;
+
+USTRUCT(BlueprintType)
+struct FCaddyVehicleEngineScaleVibrationConfig
+{
+    GENERATED_BODY()
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Feel|EngineScale", meta=(ToolTip="Enable engine vibration represented only by mesh scale changes."))
+    bool bEnableEngineScaleVibration = true;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Feel|EngineScale", meta=(ClampMin="0.0", ToolTip="Base scale variance around 1.0 when speed is near zero (engine already running)."))
+    float BaseVariance = 0.018f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Feel|EngineScale", meta=(ClampMin="0.01", ToolTip="Base oscillation frequency in Hz when speed is near zero."))
+    float BaseFrequencyHz = 6.2f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Feel|EngineScale", meta=(ClampMin="1.0", ToolTip="Speed in cm/s used to normalize curve input to [0,1]."))
+    float SpeedForCurveNormalization = 1800.0f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Feel|EngineScale", meta=(ToolTip="Optional curve for variance multiplier by normalized speed (X: 0..1 speed alpha, Y: multiplier)."))
+    TObjectPtr<UCurveFloat> VarianceBySpeedCurve = nullptr;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Feel|EngineScale", meta=(ToolTip="Optional curve for frequency multiplier by normalized speed (X: 0..1 speed alpha, Y: multiplier)."))
+    TObjectPtr<UCurveFloat> FrequencyBySpeedCurve = nullptr;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Feel|EngineScale", meta=(ClampMin="0.0", ToolTip="Extra variance added by current throttle or brake input."))
+    float ThrottleVarianceBoost = 0.010f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Feel|EngineScale", meta=(ClampMin="0.0", ToolTip="Extra frequency (Hz) added by current throttle or brake input."))
+    float ThrottleFrequencyBoostHz = 1.6f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Feel|EngineScale", meta=(ClampMin="0.0", ToolTip="Interpolation speed for variance changes."))
+    float VarianceInterpSpeed = 9.0f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Feel|EngineScale", meta=(ClampMin="0.0", ToolTip="Interpolation speed for frequency changes."))
+    float FrequencyInterpSpeed = 8.0f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Feel|EngineScale", meta=(ClampMin="0.0", ToolTip="Upper clamp for final scale variance."))
+    float MaxVariance = 0.08f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Feel|EngineScale", meta=(ClampMin="0.01", ToolTip="Lower clamp for final vibration frequency in Hz."))
+    float MinFrequencyHz = 2.2f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Feel|EngineScale", meta=(ClampMin="0.01", ToolTip="Upper clamp for final vibration frequency in Hz."))
+    float MaxFrequencyHz = 15.0f;
+};
 
 USTRUCT(BlueprintType)
 struct FCaddyVehicleFeelConfig
@@ -15,23 +61,8 @@ struct FCaddyVehicleFeelConfig
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Feel", meta=(ToolTip="Master switch for the runtime vehicle feel effects layer."))
     bool bEnableFeel = true;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Feel|Idle", meta=(ToolTip="Enables subtle idle engine shake offsets."))
-    bool bEnableIdleEngineShake = true;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Feel|Idle", meta=(ClampMin="0.0", ToolTip="Idle shake fades out above this forward speed, in cm/s."))
-    float IdleShakeMaxSpeed = 220.0f;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Feel|Idle", meta=(ClampMin="0.0", ToolTip="Maximum translational shake amplitude in cm at full idle strength."))
-    float IdleShakeLocationAmplitude = 2.4f;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Feel|Idle", meta=(ClampMin="0.0", ToolTip="Maximum rotational shake amplitude in degrees at full idle strength."))
-    float IdleShakeRotationAmplitudeDeg = 1.2f;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Feel|Idle", meta=(ClampMin="0.0", ToolTip="Oscillation frequency of idle shake, in Hz."))
-    float IdleShakeFrequency = 9.0f;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Feel|Idle", meta=(ClampMin="0.0", ToolTip="Extra idle shake multiplier added when throttle/brake input is active."))
-    float IdleInputBoost = 0.7f;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Feel|EngineScale", meta=(ToolTip="Engine scale vibration profile (non-linear with optional speed curves)."))
+    FCaddyVehicleEngineScaleVibrationConfig EngineScaleVibration;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Feel|Deform", meta=(ToolTip="Enables acceleration-driven squash/stretch deformation."))
     bool bEnableAccelerationDeform = true;
@@ -48,7 +79,7 @@ struct FCaddyVehicleFeelConfig
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Feel|Deform", meta=(ClampMin="1.0", ToolTip="Forward speed in cm/s that maps to full speed-based stretch."))
     float MaxSpeedForStretch = 2200.0f;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Feel|Lean", meta=(ToolTip="Enables lateral lean roll based on slip/cornering speed."))
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Feel|Lean", meta=(ToolTip="Enables lateral lean roll based on slip or cornering speed."))
     bool bEnableLateralLean = true;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Feel|Lean", meta=(ClampMin="1.0", ToolTip="Lateral speed in cm/s that maps to full lean roll."))
@@ -75,7 +106,7 @@ struct FCaddyVehicleFeelConfig
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Feel|Impact", meta=(ClampMin="0.0", ToolTip="Rotational kick magnitude in degrees applied by impact pulse."))
     float ImpactPulseRotationKickDeg = 4.0f;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Feel|Smoothing", meta=(ClampMin="0.0", ToolTip="Interpolation speed for location/rotation feel offsets."))
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Feel|Smoothing", meta=(ClampMin="0.0", ToolTip="Interpolation speed for location or rotation feel offsets."))
     float OffsetInterpSpeed = 8.0f;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Feel|Smoothing", meta=(ClampMin="0.0", ToolTip="Interpolation speed for scale changes caused by feel effects."))
@@ -106,6 +137,18 @@ public:
     float GetCurrentIdleStrength() const { return CurrentIdleStrength; }
 
     UFUNCTION(BlueprintPure, Category="Feel|Telemetry")
+    float GetCurrentEngineScaleSpeedAlpha() const { return CurrentEngineScaleSpeedAlpha; }
+
+    UFUNCTION(BlueprintPure, Category="Feel|Telemetry")
+    float GetCurrentEngineScaleVariance() const { return CurrentEngineScaleVariance; }
+
+    UFUNCTION(BlueprintPure, Category="Feel|Telemetry")
+    float GetCurrentEngineScaleFrequencyHz() const { return CurrentEngineScaleFrequencyHz; }
+
+    UFUNCTION(BlueprintPure, Category="Feel|Telemetry")
+    float GetCurrentEngineScaleWave() const { return CurrentEngineScaleWave; }
+
+    UFUNCTION(BlueprintPure, Category="Feel|Telemetry")
     float GetCurrentForwardAccelAlpha() const { return CurrentForwardAccelAlpha; }
 
     UFUNCTION(BlueprintPure, Category="Feel|Telemetry")
@@ -131,6 +174,12 @@ protected:
     virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
 private:
+    float EvaluateEngineCurveMultiplier(
+        const UCurveFloat* Curve,
+        float SpeedAlpha,
+        float FallbackPeakMultiplier,
+        float FallbackCruiseMultiplier) const;
+
     void ResolveRigReferences();
     bool ShouldUpdateFeel() const;
     void CacheVisualBaseTransform();
@@ -153,6 +202,11 @@ private:
     FVector ImpactPulseNormal = FVector::ZeroVector;
 
     float CurrentIdleStrength = 0.0f;
+    float EngineScaleOscillatorPhase = 0.0f;
+    float CurrentEngineScaleSpeedAlpha = 0.0f;
+    float CurrentEngineScaleVariance = 0.0f;
+    float CurrentEngineScaleFrequencyHz = 0.0f;
+    float CurrentEngineScaleWave = 0.0f;
     float CurrentForwardAccelAlpha = 0.0f;
     float CurrentSpeedStretchAlpha = 0.0f;
     float CurrentLeanRollDeg = 0.0f;

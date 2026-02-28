@@ -1,5 +1,6 @@
 #include "Debug/CaddyVehicleDebugPanelProvider.h"
 
+#include "Curves/CurveFloat.h"
 #include "HitRegister/HitRegisterPipeline.h"
 #include "Vehicle/ArcadeVehicleMovementComponent.h"
 #include "Vehicle/CaddyVehicleCameraComponent.h"
@@ -213,7 +214,8 @@ void UCaddyVehicleDebugPanelProvider::GatherTuningRows(TArray<FDebugFrameworkPan
     if (const UCaddyVehicleFeelComponent* FeelComponent = Pawn->GetVehicleFeelComponent())
     {
         AddRow(OutRows, TEXT("Feel Enabled"), BoolToOnOff(FeelComponent->FeelConfig.bEnableFeel));
-        AddRow(OutRows, TEXT("Feel IdleAmp"), FString::Printf(TEXT("%.2f"), FeelComponent->FeelConfig.IdleShakeLocationAmplitude));
+        AddRow(OutRows, TEXT("Feel EngineVar"), FString::Printf(TEXT("%.3f"), FeelComponent->FeelConfig.EngineScaleVibration.BaseVariance));
+        AddRow(OutRows, TEXT("Feel EngineFreq"), FString::Printf(TEXT("%.2f"), FeelComponent->FeelConfig.EngineScaleVibration.BaseFrequencyHz));
         AddRow(OutRows, TEXT("Feel MaxLean"), FString::Printf(TEXT("%.1f"), FeelComponent->FeelConfig.MaxLateralLeanRollDeg));
         AddRow(OutRows, TEXT("Feel ImpactScale"), FString::Printf(TEXT("%.2f"), FeelComponent->FeelConfig.ImpactPulseScale));
     }
@@ -231,7 +233,11 @@ void UCaddyVehicleDebugPanelProvider::GatherFeelRows(TArray<FDebugFrameworkPanel
 
     AddRow(OutRows, TEXT("Enabled"), BoolToOnOff(FeelComponent->FeelConfig.bEnableFeel));
     AddRow(OutRows, TEXT("RigReady"), BoolToOnOff(FeelComponent->IsFeelRigReady()));
-    AddRow(OutRows, TEXT("IdleStrength"), FString::Printf(TEXT("%.2f"), FeelComponent->GetCurrentIdleStrength()));
+    AddRow(OutRows, TEXT("EngineStrength"), FString::Printf(TEXT("%.2f"), FeelComponent->GetCurrentIdleStrength()));
+    AddRow(OutRows, TEXT("EngineSpeedAlpha"), FString::Printf(TEXT("%.2f"), FeelComponent->GetCurrentEngineScaleSpeedAlpha()));
+    AddRow(OutRows, TEXT("EngineVariance"), FString::Printf(TEXT("%.4f"), FeelComponent->GetCurrentEngineScaleVariance()));
+    AddRow(OutRows, TEXT("EngineFreqHz"), FString::Printf(TEXT("%.2f"), FeelComponent->GetCurrentEngineScaleFrequencyHz()));
+    AddRow(OutRows, TEXT("EngineWave"), FString::Printf(TEXT("%.2f"), FeelComponent->GetCurrentEngineScaleWave()));
     AddRow(OutRows, TEXT("AccelAlpha"), FString::Printf(TEXT("%.2f"), FeelComponent->GetCurrentForwardAccelAlpha()));
     AddRow(OutRows, TEXT("SpeedStretch"), FString::Printf(TEXT("%.2f"), FeelComponent->GetCurrentSpeedStretchAlpha()));
     AddRow(OutRows, TEXT("LeanRollDeg"), FString::Printf(TEXT("%.2f"), FeelComponent->GetCurrentLeanRollDeg()));
@@ -244,11 +250,21 @@ void UCaddyVehicleDebugPanelProvider::GatherFeelRows(TArray<FDebugFrameworkPanel
     AddRow(OutRows, TEXT("RotOffset"), FString::Printf(TEXT("(%.2f, %.2f, %.2f)"), RotationOffset.Pitch, RotationOffset.Yaw, RotationOffset.Roll));
     AddRow(OutRows, TEXT("ScaleMult"), FString::Printf(TEXT("(%.3f, %.3f, %.3f)"), ScaleMultiplier.X, ScaleMultiplier.Y, ScaleMultiplier.Z));
 
-    AddRow(OutRows, TEXT("Cfg IdleEnabled"), BoolToOnOff(FeelComponent->FeelConfig.bEnableIdleEngineShake));
-    AddRow(OutRows, TEXT("Cfg IdleMaxSpeed"), FString::Printf(TEXT("%.1f"), FeelComponent->FeelConfig.IdleShakeMaxSpeed));
-    AddRow(OutRows, TEXT("Cfg IdleLocAmp"), FString::Printf(TEXT("%.2f"), FeelComponent->FeelConfig.IdleShakeLocationAmplitude));
-    AddRow(OutRows, TEXT("Cfg IdleRotAmp"), FString::Printf(TEXT("%.2f"), FeelComponent->FeelConfig.IdleShakeRotationAmplitudeDeg));
-    AddRow(OutRows, TEXT("Cfg IdleFreq"), FString::Printf(TEXT("%.2f"), FeelComponent->FeelConfig.IdleShakeFrequency));
+    AddRow(OutRows, TEXT("Cfg Eng Enabled"), BoolToOnOff(FeelComponent->FeelConfig.EngineScaleVibration.bEnableEngineScaleVibration));
+    AddRow(OutRows, TEXT("Cfg Eng BaseVar"), FString::Printf(TEXT("%.4f"), FeelComponent->FeelConfig.EngineScaleVibration.BaseVariance));
+    AddRow(OutRows, TEXT("Cfg Eng BaseHz"), FString::Printf(TEXT("%.2f"), FeelComponent->FeelConfig.EngineScaleVibration.BaseFrequencyHz));
+    AddRow(OutRows, TEXT("Cfg Eng SpeedNorm"), FString::Printf(TEXT("%.1f"), FeelComponent->FeelConfig.EngineScaleVibration.SpeedForCurveNormalization));
+    AddRow(OutRows, TEXT("Cfg Eng ThrottleVar"), FString::Printf(TEXT("%.3f"), FeelComponent->FeelConfig.EngineScaleVibration.ThrottleVarianceBoost));
+    AddRow(OutRows, TEXT("Cfg Eng ThrottleHz"), FString::Printf(TEXT("%.2f"), FeelComponent->FeelConfig.EngineScaleVibration.ThrottleFrequencyBoostHz));
+    AddRow(OutRows, TEXT("Cfg Eng MaxVar"), FString::Printf(TEXT("%.3f"), FeelComponent->FeelConfig.EngineScaleVibration.MaxVariance));
+    AddRow(OutRows, TEXT("Cfg Eng MinHz"), FString::Printf(TEXT("%.2f"), FeelComponent->FeelConfig.EngineScaleVibration.MinFrequencyHz));
+    AddRow(OutRows, TEXT("Cfg Eng MaxHz"), FString::Printf(TEXT("%.2f"), FeelComponent->FeelConfig.EngineScaleVibration.MaxFrequencyHz));
+    AddRow(OutRows, TEXT("Cfg Eng VarCurve"), FeelComponent->FeelConfig.EngineScaleVibration.VarianceBySpeedCurve
+        ? FeelComponent->FeelConfig.EngineScaleVibration.VarianceBySpeedCurve->GetName()
+        : TEXT("None"));
+    AddRow(OutRows, TEXT("Cfg Eng FreqCurve"), FeelComponent->FeelConfig.EngineScaleVibration.FrequencyBySpeedCurve
+        ? FeelComponent->FeelConfig.EngineScaleVibration.FrequencyBySpeedCurve->GetName()
+        : TEXT("None"));
     AddRow(OutRows, TEXT("Cfg MaxAccelDeform"), FString::Printf(TEXT("%.1f"), FeelComponent->FeelConfig.MaxAccelSquashStretch));
     AddRow(OutRows, TEXT("Cfg MaxSpeedStretch"), FString::Printf(TEXT("%.2f"), FeelComponent->FeelConfig.MaxSpeedStretch));
     AddRow(OutRows, TEXT("Cfg MaxLeanRoll"), FString::Printf(TEXT("%.1f"), FeelComponent->FeelConfig.MaxLateralLeanRollDeg));
