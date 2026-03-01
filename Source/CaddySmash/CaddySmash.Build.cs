@@ -24,7 +24,8 @@ public class CaddySmash : ModuleRules
 		{
 			"DebugFrameworkCore",
 			"HitRegisterCore",
-			"HitRegisterCollision"
+			"HitRegisterCollision",
+			"HitRegisterGASAdapter"
 		});
 
 		// Uncomment if you are using Slate UI

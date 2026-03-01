@@ -69,6 +69,15 @@ enum class ECaddyVehicleCollisionResponseMode : uint8
     ArcadeWallGlide
 };
 
+UENUM(BlueprintType)
+enum class ECaddyVehicleCollisionImpactTier : uint8
+{
+    None,
+    Light,
+    Medium,
+    Heavy
+};
+
 USTRUCT(BlueprintType)
 struct FCaddyVehicleCollisionHitRegisterConfig
 {
@@ -86,13 +95,7 @@ struct FCaddyVehicleCollisionHitRegisterConfig
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Collision|HitRegister", meta=(ClampMin="0.0", ToolTip="Minimum time between collision hit events, in seconds."))
     float EventCooldownSeconds = 0.2f;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Collision|HitRegister", meta=(ClampMin="0.0", ToolTip="Damage coefficient multiplied by normal impact speed to produce base damage."))
-    float BaseDamageByNormalImpactSpeed = 0.012f;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Collision|HitRegister", meta=(ClampMin="0.0", ToolTip="Flat damage added on top of the impact-speed scaled damage."))
-    float BaseDamageBias = 0.0f;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Collision|HitRegister", meta=(ToolTip="Always-applied gameplay tags attached to emitted collision hit events."))
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Collision|HitRegister", meta=(ToolTip="Always-applied gameplay tags attached to emitted collision hit events before pipeline processing."))
     FGameplayTagContainer BaseTags;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Collision|HitRegister", meta=(ToolTip="Tag appended when the collision target is world static geometry."))
@@ -107,14 +110,41 @@ struct FCaddyVehicleCollisionHitRegisterConfig
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Collision|HitRegister", meta=(ToolTip="Tag appended when the vehicle is drifting at impact time."))
     FGameplayTag DriftingTag;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Collision|HitRegister", meta=(ToolTip="Optional attribute tag receiving the vehicle total speed value on event publish."))
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Collision|HitRegister", meta=(ToolTip="Tag appended when the collision target is another vehicle pawn with arcade movement."))
+    FGameplayTag VehicleTargetTag;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Collision|HitRegister", meta=(ToolTip="Tag appended when collision is emitted while skill dash state is active."))
+    FGameplayTag SkillDashTag;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Collision|HitRegister", meta=(ToolTip="Attribute tag receiving the vehicle total speed value on event publish. If empty, Attr.Collision.TotalSpeed is used."))
     FGameplayTag SpeedAttributeTag;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Collision|HitRegister", meta=(ToolTip="Optional attribute tag receiving the normal impact speed value on event publish."))
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Collision|HitRegister", meta=(ToolTip="Attribute tag receiving normal impact speed on event publish. If empty, Attr.Collision.NormalImpactSpeed is used."))
     FGameplayTag NormalImpactSpeedAttributeTag;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Collision|HitRegister", meta=(ToolTip="Optional attribute tag receiving drifting state (0 or 1) on event publish."))
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Collision|HitRegister", meta=(ToolTip="Attribute tag receiving collision target speed on event publish. If empty, Attr.Collision.TargetSpeed is used."))
+    FGameplayTag TargetSpeedAttributeTag;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Collision|HitRegister", meta=(ToolTip="Attribute tag receiving target-relative normal impact speed on event publish. If empty, Attr.Collision.RelativeNormalImpactSpeed is used."))
+    FGameplayTag RelativeNormalSpeedAttributeTag;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Collision|HitRegister", meta=(ToolTip="Pipeline output attribute tag for computed impact score. If empty, Attr.Collision.ImpactScore is used."))
+    FGameplayTag ImpactScoreAttributeTag;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Collision|HitRegister", meta=(ToolTip="Pipeline output attribute tag for impact tier as float (0=None,1=Light,2=Medium,3=Heavy). If empty, Attr.Collision.ImpactTier is used."))
+    FGameplayTag ImpactTierAttributeTag;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Collision|HitRegister", meta=(ToolTip="Attribute tag receiving whether the current collision target is vehicle-like (0 or 1). If empty, Attr.Collision.TargetIsVehicle is used."))
+    FGameplayTag TargetVehicleAttributeTag;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Collision|HitRegister", meta=(ToolTip="Attribute tag receiving whether attacker is in skill dash state (0 or 1). If empty, Attr.Collision.IsSkillDashing is used."))
+    FGameplayTag SkillDashingAttributeTag;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Collision|HitRegister", meta=(ToolTip="Attribute tag receiving drifting state (0 or 1) on event publish. If empty, Attr.Collision.IsDrifting is used."))
     FGameplayTag DriftingAttributeTag;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Collision|HitRegister", meta=(ToolTip="Pipeline output attribute tag for effective normal impact speed used by collision adjudication. If empty, Attr.Collision.EffectiveNormalImpactSpeed is used."))
+    FGameplayTag EffectiveNormalSpeedAttributeTag;
 };
 
 USTRUCT(BlueprintType)
@@ -267,6 +297,24 @@ public:
     float GetLastCollisionNormalImpactSpeed() const { return LastBlockingHitNormalSpeed; }
 
     UFUNCTION(BlueprintPure, Category="Vehicle|Collision")
+    float GetLastCollisionRelativeNormalSpeed() const { return LastCollisionRelativeNormalSpeed; }
+
+    UFUNCTION(BlueprintPure, Category="Vehicle|Collision")
+    float GetLastCollisionEffectiveNormalSpeed() const { return LastCollisionEffectiveNormalSpeed; }
+
+    UFUNCTION(BlueprintPure, Category="Vehicle|Collision")
+    float GetLastCollisionImpactScore() const { return LastCollisionImpactScore; }
+
+    UFUNCTION(BlueprintPure, Category="Vehicle|Collision")
+    ECaddyVehicleCollisionImpactTier GetLastCollisionImpactTier() const { return LastCollisionImpactTier; }
+
+    UFUNCTION(BlueprintPure, Category="Vehicle|Collision")
+    bool WasLastCollisionTargetVehicle() const { return bLastCollisionTargetWasVehicle; }
+
+    UFUNCTION(BlueprintPure, Category="Vehicle|Collision")
+    bool WasLastCollisionDuringSkillDash() const { return bLastCollisionAttackerWasDashing; }
+
+    UFUNCTION(BlueprintPure, Category="Vehicle|Collision")
     FVector GetLastCollisionLocation() const { return LastBlockingHitLocation; }
 
     UFUNCTION(BlueprintPure, Category="Vehicle|Collision")
@@ -319,7 +367,11 @@ private:
         float DeltaTime,
         float& OutNormalImpactSpeed,
         FVector& OutTangentDirection) const;
-    void TryEmitCollisionHitRegisterEvent(const FHitResult& Hit, float TotalSpeed, float NormalImpactSpeed);
+    void TryEmitCollisionHitRegisterEvent(
+        const FVector& PreImpactVelocity,
+        const FHitResult& Hit,
+        float TotalSpeed,
+        float NormalImpactSpeed);
     void CacheCollisionTelemetry(
         const FHitResult& Hit,
         float TotalSpeed,
@@ -331,6 +383,12 @@ private:
     float LastCollisionHitRegisterWorldTime = -1.0f;
     float LastBlockingHitSpeed = 0.0f;
     float LastBlockingHitNormalSpeed = 0.0f;
+    float LastCollisionRelativeNormalSpeed = 0.0f;
+    float LastCollisionEffectiveNormalSpeed = 0.0f;
+    float LastCollisionImpactScore = 0.0f;
+    ECaddyVehicleCollisionImpactTier LastCollisionImpactTier = ECaddyVehicleCollisionImpactTier::None;
+    bool bLastCollisionTargetWasVehicle = false;
+    bool bLastCollisionAttackerWasDashing = false;
     FVector LastBlockingHitLocation = FVector::ZeroVector;
     FVector LastBlockingHitNormal = FVector::ZeroVector;
     FVector LastBlockingHitTangent = FVector::ZeroVector;

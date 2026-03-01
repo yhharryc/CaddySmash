@@ -84,18 +84,29 @@
   - speed thresholds (`MinSpeedForEvent`, `MinNormalImpactSpeedForEvent`)
   - cooldown (`EventCooldownSeconds`)
 - Attack payload:
-  - `BaseDamage = BaseDamageBias + NormalImpactSpeed * BaseDamageByNormalImpactSpeed`
-  - optional tags:
+  - movement publishes raw collision telemetry only (no local tier/damage adjudication).
+  - base damage is initialized as `0` and expected to be decided in pipeline nodes.
+  - tags:
     - base tags (`BaseTags`)
     - target object type tags (`WorldStaticTag`, `WorldDynamicTag`, `PawnTag`)
-    - drift state tag (`DriftingTag`)
-  - optional attributes:
-    - speed (`SpeedAttributeTag`)
-    - normal impact speed (`NormalImpactSpeedAttributeTag`)
-    - drifting state (`DriftingAttributeTag`)
+    - state tags (`VehicleTargetTag`, `DriftingTag`, `SkillDashTag`)
+  - raw attributes:
+    - `Attr.Collision.TotalSpeed` (`SpeedAttributeTag`)
+    - `Attr.Collision.NormalImpactSpeed` (`NormalImpactSpeedAttributeTag`)
+    - `Attr.Collision.TargetSpeed` (`TargetSpeedAttributeTag`)
+    - `Attr.Collision.RelativeNormalImpactSpeed` (`RelativeNormalSpeedAttributeTag`)
+    - `Attr.Collision.TargetIsVehicle` (`TargetVehicleAttributeTag`)
+    - `Attr.Collision.IsDrifting` (`DriftingAttributeTag`)
+    - `Attr.Collision.IsSkillDashing` (`SkillDashingAttributeTag`)
+  - pipeline output attributes (optional, for telemetry/debug):
+    - `Attr.Collision.EffectiveNormalImpactSpeed` (`EffectiveNormalSpeedAttributeTag`)
+    - `Attr.Collision.ImpactScore` (`ImpactScoreAttributeTag`)
+    - `Attr.Collision.ImpactTier` (`ImpactTierAttributeTag`)
 - Pipeline source:
   - uses `CollisionHitRegisterPipeline` from current tuning data asset (applied onto movement component)
   - otherwise falls back to `HitRegisterSettings.DefaultPipeline`
+- Recommended collision combat node:
+  - `UHRN_AdjudicateVehicleCollision` in `HitRegisterCore` centralizes collision tiering, clash tagging, and damage derivation.
 
 ## Camera Management (Phase 1)
 - Current approach:

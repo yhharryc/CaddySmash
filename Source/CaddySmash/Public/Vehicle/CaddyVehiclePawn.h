@@ -9,7 +9,9 @@
 class UAbilitySystemComponent;
 class UGameplayAbility;
 class UCaddyVehicleCameraComponent;
+class UCaddyVehicleAttributeSet;
 class UCaddyVehicleFeelComponent;
+class UCaddyVehicleHitRegisterDamageableComponent;
 class UCaddyVehicleSkillComponent;
 class UArcadeVehicleMovementComponent;
 class UCaddyVehicleDebugPanelProvider;
@@ -84,6 +86,15 @@ public:
     UFUNCTION(BlueprintPure, Category="Vehicle|Skill")
     UCaddyVehicleSkillConfigDataAsset* GetSkillConfigDataAsset() const { return SkillConfigDataAsset; }
 
+    UFUNCTION(BlueprintPure, Category="Vehicle|Attributes")
+    float GetVehicleHealth() const;
+
+    UFUNCTION(BlueprintPure, Category="Vehicle|Attributes")
+    float GetVehicleMaxHealth() const;
+
+    UFUNCTION(BlueprintPure, Category="Vehicle|Attributes")
+    float GetVehicleKnockbackResistance() const;
+
 protected:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Vehicle|Components")
     TObjectPtr<UCapsuleComponent> CollisionComponent;
@@ -109,8 +120,20 @@ protected:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Vehicle|Components")
     TObjectPtr<UCaddyVehicleSkillComponent> VehicleSkillComponent;
 
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Vehicle|Components")
+    TObjectPtr<UCaddyVehicleHitRegisterDamageableComponent> VehicleDamageableComponent;
+
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Vehicle|Ability")
     TObjectPtr<UAbilitySystemComponent> AbilitySystemComponent;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Vehicle|Ability")
+    TObjectPtr<UCaddyVehicleAttributeSet> VehicleAttributeSet;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Vehicle|Attributes", meta=(ClampMin="1.0"))
+    float DefaultMaxHealth = 100.0f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Vehicle|Attributes", meta=(ClampMin="0.0", ClampMax="0.95"))
+    float DefaultKnockbackResistance = 0.0f;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Vehicle|Debug")
     bool bEnableVehicleDebugPanels = true;
@@ -123,6 +146,9 @@ protected:
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Vehicle|Skill")
     TObjectPtr<UCaddyVehicleSkillConfigDataAsset> SkillConfigDataAsset = nullptr;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Vehicle|Ability")
+    TSubclassOf<UGameplayAbility> KnockbackAbilityClass;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Vehicle|Input|Enhanced")
     TObjectPtr<UInputMappingContext> DefaultInputMappingContext = nullptr;
@@ -148,6 +174,9 @@ protected:
 private:
     void GrantOrRefreshSkillAbility();
     void ClearGrantedSkillAbility();
+    void GrantOrRefreshKnockbackAbility();
+    void ClearGrantedKnockbackAbility();
+    void InitializeVehicleAttributes();
     bool TryActivateSkillAbility();
     bool IsSkillComboTriggerHeld() const;
 
@@ -188,6 +217,7 @@ private:
     FVector2D RawMoveInput = FVector2D::ZeroVector;
 
     FGameplayAbilitySpecHandle SkillAbilitySpecHandle;
+    FGameplayAbilitySpecHandle KnockbackAbilitySpecHandle;
 
     UPROPERTY(Transient)
     TArray<TObjectPtr<UCaddyVehicleDebugPanelProvider>> DebugPanelProviders;

@@ -35,6 +35,11 @@ namespace
         const UEnum* Enum = StaticEnum<ENetRole>();
         return Enum ? Enum->GetNameStringByValue(static_cast<int64>(Role)) : TEXT("Unknown");
     }
+
+    static FString TagToString(const FGameplayTag& Tag)
+    {
+        return Tag.IsValid() ? Tag.ToString() : TEXT("Default");
+    }
 }
 
 void UCaddyVehicleDebugPanelProvider::Initialize(
@@ -135,6 +140,12 @@ void UCaddyVehicleDebugPanelProvider::GatherCoreRows(TArray<FDebugFrameworkPanel
     AddRow(OutRows, TEXT("LocalRole"), NetRoleToString(Pawn->GetLocalRole()));
     AddRow(OutRows, TEXT("RemoteRole"), NetRoleToString(Pawn->GetRemoteRole()));
     AddRow(OutRows, TEXT("WorldSpeed"), FString::Printf(TEXT("%.1f"), Pawn->GetVelocity().Size2D()));
+    AddRow(
+        OutRows,
+        TEXT("Health"),
+        FString::Printf(TEXT("%.1f / %.1f"), Pawn->GetVehicleHealth(), Pawn->GetVehicleMaxHealth()),
+        Pawn->GetVehicleHealth() <= 0.0f ? FLinearColor::Red : FLinearColor::White);
+    AddRow(OutRows, TEXT("KnockbackResist"), FString::Printf(TEXT("%.2f"), Pawn->GetVehicleKnockbackResistance()));
 
     const FVector2D LocalVelocity = MovementComponent->GetLocalPlanarVelocity();
     AddRow(OutRows, TEXT("ForwardSpeed"), FString::Printf(TEXT("%.1f"), LocalVelocity.X));
@@ -419,8 +430,20 @@ void UCaddyVehicleDebugPanelProvider::GatherCollisionRows(TArray<FDebugFramework
     const float TimeSinceHit = MovementComponent->GetTimeSinceLastBlockingHit();
     AddRow(OutRows, TEXT("LastHitAge"), TimeSinceHit >= 0.0f ? FString::Printf(TEXT("%.3fs"), TimeSinceHit) : TEXT("n/a"));
     AddRow(OutRows, TEXT("LastHitActor"), MovementComponent->GetLastCollisionActorName());
-    AddRow(OutRows, TEXT("LastHitSpeed"), FString::Printf(TEXT("%.1f"), MovementComponent->GetLastCollisionSpeed()));
-    AddRow(OutRows, TEXT("LastNormalImpact"), FString::Printf(TEXT("%.1f"), MovementComponent->GetLastCollisionNormalImpactSpeed()));
+    AddRow(OutRows, TEXT("Raw TotalSpeed"), FString::Printf(TEXT("%.1f"), MovementComponent->GetLastCollisionSpeed()));
+    AddRow(OutRows, TEXT("Raw NormalImpact"), FString::Printf(TEXT("%.1f"), MovementComponent->GetLastCollisionNormalImpactSpeed()));
+    AddRow(OutRows, TEXT("Raw RelNormal"), FString::Printf(TEXT("%.1f"), MovementComponent->GetLastCollisionRelativeNormalSpeed()));
+    AddRow(OutRows, TEXT("Pipeline EffNormal"), FString::Printf(TEXT("%.1f"), MovementComponent->GetLastCollisionEffectiveNormalSpeed()));
+    AddRow(OutRows, TEXT("Pipeline ImpactScore"), FString::Printf(TEXT("%.1f"), MovementComponent->GetLastCollisionImpactScore()));
+    const UEnum* ImpactTierEnum = StaticEnum<ECaddyVehicleCollisionImpactTier>();
+    AddRow(
+        OutRows,
+        TEXT("Pipeline ImpactTier"),
+        ImpactTierEnum
+            ? ImpactTierEnum->GetNameStringByValue(static_cast<int64>(MovementComponent->GetLastCollisionImpactTier()))
+            : TEXT("Unknown"));
+    AddRow(OutRows, TEXT("LastTargetVehicle"), BoolToOnOff(MovementComponent->WasLastCollisionTargetVehicle()));
+    AddRow(OutRows, TEXT("LastDuringDash"), BoolToOnOff(MovementComponent->WasLastCollisionDuringSkillDash()));
 
     const FVector HitLocation = MovementComponent->GetLastCollisionLocation();
     const FVector HitNormal = MovementComponent->GetLastCollisionNormal();
@@ -442,8 +465,16 @@ void UCaddyVehicleDebugPanelProvider::GatherCollisionRows(TArray<FDebugFramework
     AddRow(OutRows, TEXT("HR MinSpeed"), FString::Printf(TEXT("%.1f"), MovementComponent->CollisionConfig.HitRegister.MinSpeedForEvent));
     AddRow(OutRows, TEXT("HR MinNormalSpeed"), FString::Printf(TEXT("%.1f"), MovementComponent->CollisionConfig.HitRegister.MinNormalImpactSpeedForEvent));
     AddRow(OutRows, TEXT("HR Cooldown"), FString::Printf(TEXT("%.2f"), MovementComponent->CollisionConfig.HitRegister.EventCooldownSeconds));
-    AddRow(OutRows, TEXT("HR DamageScale"), FString::Printf(TEXT("%.4f"), MovementComponent->CollisionConfig.HitRegister.BaseDamageByNormalImpactSpeed));
-    AddRow(OutRows, TEXT("HR DamageBias"), FString::Printf(TEXT("%.2f"), MovementComponent->CollisionConfig.HitRegister.BaseDamageBias));
+    AddRow(OutRows, TEXT("AttrTag TotalSpeed"), TagToString(MovementComponent->CollisionConfig.HitRegister.SpeedAttributeTag));
+    AddRow(OutRows, TEXT("AttrTag NormalImpact"), TagToString(MovementComponent->CollisionConfig.HitRegister.NormalImpactSpeedAttributeTag));
+    AddRow(OutRows, TEXT("AttrTag TargetSpeed"), TagToString(MovementComponent->CollisionConfig.HitRegister.TargetSpeedAttributeTag));
+    AddRow(OutRows, TEXT("AttrTag RelNormal"), TagToString(MovementComponent->CollisionConfig.HitRegister.RelativeNormalSpeedAttributeTag));
+    AddRow(OutRows, TEXT("AttrTag IsDrifting"), TagToString(MovementComponent->CollisionConfig.HitRegister.DriftingAttributeTag));
+    AddRow(OutRows, TEXT("AttrTag IsDashing"), TagToString(MovementComponent->CollisionConfig.HitRegister.SkillDashingAttributeTag));
+    AddRow(OutRows, TEXT("AttrTag TargetVehicle"), TagToString(MovementComponent->CollisionConfig.HitRegister.TargetVehicleAttributeTag));
+    AddRow(OutRows, TEXT("AttrTag OutEffNormal"), TagToString(MovementComponent->CollisionConfig.HitRegister.EffectiveNormalSpeedAttributeTag));
+    AddRow(OutRows, TEXT("AttrTag OutScore"), TagToString(MovementComponent->CollisionConfig.HitRegister.ImpactScoreAttributeTag));
+    AddRow(OutRows, TEXT("AttrTag OutTier"), TagToString(MovementComponent->CollisionConfig.HitRegister.ImpactTierAttributeTag));
 }
 
 void UCaddyVehicleDebugPanelProvider::GatherDebugDrawRows(TArray<FDebugFrameworkPanelRow>& OutRows) const

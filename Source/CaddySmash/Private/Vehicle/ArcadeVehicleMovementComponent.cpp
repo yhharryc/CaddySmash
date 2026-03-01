@@ -7,7 +7,48 @@
 #include "HitRegister/HitRegisterBPLibrary.h"
 #include "HitRegister/HitRegisterPipeline.h"
 #include "HitRegister/HitRegisterTypes.h"
+#include "Vehicle/CaddyVehicleSkillComponent.h"
 #include "Vehicle/CaddyVehicleTuningDataAsset.h"
+
+namespace
+{
+    static FGameplayTag ResolveCollisionAttributeTag(const FGameplayTag& ConfiguredTag, const TCHAR* FallbackTagName)
+    {
+        if (ConfiguredTag.IsValid())
+        {
+            return ConfiguredTag;
+        }
+        return FGameplayTag::RequestGameplayTag(FName(FallbackTagName), false);
+    }
+
+    static void AddAttributeIfValid(TMap<FGameplayTag, float>& Attributes, const FGameplayTag& Tag, const float Value)
+    {
+        if (Tag.IsValid())
+        {
+            Attributes.Add(Tag, Value);
+        }
+    }
+
+    static float GetAttributeOrDefault(const TMap<FGameplayTag, float>& Attributes, const FGameplayTag& Tag, const float DefaultValue = 0.0f)
+    {
+        if (!Tag.IsValid())
+        {
+            return DefaultValue;
+        }
+
+        if (const float* Value = Attributes.Find(Tag))
+        {
+            return *Value;
+        }
+        return DefaultValue;
+    }
+
+    static ECaddyVehicleCollisionImpactTier ToImpactTier(const float RawTierValue)
+    {
+        const int32 TierAsInt = FMath::Clamp(FMath::RoundToInt(RawTierValue), 0, 3);
+        return static_cast<ECaddyVehicleCollisionImpactTier>(TierAsInt);
+    }
+}
 
 UArcadeVehicleMovementComponent::UArcadeVehicleMovementComponent()
 {
@@ -301,7 +342,7 @@ void UArcadeVehicleMovementComponent::HandleBlockingCollision(
 
     const float TotalSpeed = FVector(PreImpactVelocity.X, PreImpactVelocity.Y, 0.0f).Size();
     CacheCollisionTelemetry(Hit, TotalSpeed, NormalImpactSpeed, TangentDirection);
-    TryEmitCollisionHitRegisterEvent(Hit, TotalSpeed, NormalImpactSpeed);
+    TryEmitCollisionHitRegisterEvent(PreImpactVelocity, Hit, TotalSpeed, NormalImpactSpeed);
 
     if (CollisionConfig.PushOutDistance > KINDA_SMALL_NUMBER)
     {
@@ -398,11 +439,21 @@ FVector UArcadeVehicleMovementComponent::ComputeArcadeWallGlideVelocity(
     return Result;
 }
 
-void UArcadeVehicleMovementComponent::TryEmitCollisionHitRegisterEvent(const FHitResult& Hit, float TotalSpeed, float NormalImpactSpeed)
+void UArcadeVehicleMovementComponent::TryEmitCollisionHitRegisterEvent(
+    const FVector& PreImpactVelocity,
+    const FHitResult& Hit,
+    float TotalSpeed,
+    float NormalImpactSpeed)
 {
     bLastCollisionTriggeredHitRegister = false;
     bLastCollisionHitRegisterSucceeded = false;
     LastCollisionHitRegisterStatus = TEXT("Filtered");
+    LastCollisionRelativeNormalSpeed = 0.0f;
+    LastCollisionEffectiveNormalSpeed = 0.0f;
+    LastCollisionImpactScore = 0.0f;
+    LastCollisionImpactTier = ECaddyVehicleCollisionImpactTier::None;
+    bLastCollisionTargetWasVehicle = false;
+    bLastCollisionAttackerWasDashing = false;
 
     if (!PawnOwner || !PawnOwner->HasAuthority())
     {
@@ -445,15 +496,36 @@ void UArcadeVehicleMovementComponent::TryEmitCollisionHitRegisterEvent(const FHi
         return;
     }
 
+    AActor* HitActor = Hit.GetActor();
+    const UPrimitiveComponent* HitComponent = Hit.GetComponent();
+    const bool bTargetIsVehicle = HitActor && HitActor->FindComponentByClass<UArcadeVehicleMovementComponent>() != nullptr;
+    bLastCollisionTargetWasVehicle = bTargetIsVehicle;
+
+    const FVector PlanarNormal = FVector(Hit.Normal.X, Hit.Normal.Y, 0.0f).GetSafeNormal();
+    const FVector SelfPlanarVelocity = FVector(PreImpactVelocity.X, PreImpactVelocity.Y, 0.0f);
+    const FVector TargetPlanarVelocity = HitActor
+        ? FVector(HitActor->GetVelocity().X, HitActor->GetVelocity().Y, 0.0f)
+        : FVector::ZeroVector;
+    const float TargetSpeed = TargetPlanarVelocity.Size2D();
+    const FVector RelativePlanarVelocity = SelfPlanarVelocity - TargetPlanarVelocity;
+    const float RelativeNormalSpeed = !PlanarNormal.IsNearlyZero()
+        ? FMath::Max(0.0f, -FVector::DotProduct(RelativePlanarVelocity, PlanarNormal))
+        : NormalImpactSpeed;
+    LastCollisionRelativeNormalSpeed = RelativeNormalSpeed;
+
+    bool bIsSkillDashing = false;
+    if (const UCaddyVehicleSkillComponent* SkillComponent = PawnOwner->FindComponentByClass<UCaddyVehicleSkillComponent>())
+    {
+        bIsSkillDashing = SkillComponent->GetSkillState() == ECaddyVehicleSkillState::Dashing;
+    }
+    bLastCollisionAttackerWasDashing = bIsSkillDashing;
+
     FAttackRequest AttackRequest;
     AttackRequest.Instigator = PawnOwner;
     AttackRequest.SourceObject = this;
-    AttackRequest.BaseDamage = FMath::Max(
-        0.0f,
-        HitRegisterConfig.BaseDamageBias + (NormalImpactSpeed * HitRegisterConfig.BaseDamageByNormalImpactSpeed));
+    AttackRequest.BaseDamage = 0.0f;
     AttackRequest.Tags.AppendTags(HitRegisterConfig.BaseTags);
 
-    const UPrimitiveComponent* HitComponent = Hit.GetComponent();
     if (HitComponent)
     {
         if (HitComponent->GetCollisionObjectType() == ECC_WorldStatic && HitRegisterConfig.WorldStaticTag.IsValid())
@@ -470,23 +542,38 @@ void UArcadeVehicleMovementComponent::TryEmitCollisionHitRegisterEvent(const FHi
         }
     }
 
+    if (bTargetIsVehicle && HitRegisterConfig.VehicleTargetTag.IsValid())
+    {
+        AttackRequest.Tags.AddTag(HitRegisterConfig.VehicleTargetTag);
+    }
+
     if (bIsDrifting && HitRegisterConfig.DriftingTag.IsValid())
     {
         AttackRequest.Tags.AddTag(HitRegisterConfig.DriftingTag);
     }
+    if (bIsSkillDashing && HitRegisterConfig.SkillDashTag.IsValid())
+    {
+        AttackRequest.Tags.AddTag(HitRegisterConfig.SkillDashTag);
+    }
 
-    if (HitRegisterConfig.SpeedAttributeTag.IsValid())
-    {
-        AttackRequest.Attributes.Add(HitRegisterConfig.SpeedAttributeTag, TotalSpeed);
-    }
-    if (HitRegisterConfig.NormalImpactSpeedAttributeTag.IsValid())
-    {
-        AttackRequest.Attributes.Add(HitRegisterConfig.NormalImpactSpeedAttributeTag, NormalImpactSpeed);
-    }
-    if (HitRegisterConfig.DriftingAttributeTag.IsValid())
-    {
-        AttackRequest.Attributes.Add(HitRegisterConfig.DriftingAttributeTag, bIsDrifting ? 1.0f : 0.0f);
-    }
+    const FGameplayTag TotalSpeedAttributeTag = ResolveCollisionAttributeTag(HitRegisterConfig.SpeedAttributeTag, TEXT("Attr.Collision.TotalSpeed"));
+    const FGameplayTag NormalSpeedAttributeTag = ResolveCollisionAttributeTag(HitRegisterConfig.NormalImpactSpeedAttributeTag, TEXT("Attr.Collision.NormalImpactSpeed"));
+    const FGameplayTag TargetSpeedAttributeTag = ResolveCollisionAttributeTag(HitRegisterConfig.TargetSpeedAttributeTag, TEXT("Attr.Collision.TargetSpeed"));
+    const FGameplayTag RelativeNormalSpeedAttributeTag = ResolveCollisionAttributeTag(HitRegisterConfig.RelativeNormalSpeedAttributeTag, TEXT("Attr.Collision.RelativeNormalImpactSpeed"));
+    const FGameplayTag DriftingStateAttributeTag = ResolveCollisionAttributeTag(HitRegisterConfig.DriftingAttributeTag, TEXT("Attr.Collision.IsDrifting"));
+    const FGameplayTag SkillDashStateAttributeTag = ResolveCollisionAttributeTag(HitRegisterConfig.SkillDashingAttributeTag, TEXT("Attr.Collision.IsSkillDashing"));
+    const FGameplayTag TargetVehicleStateAttributeTag = ResolveCollisionAttributeTag(HitRegisterConfig.TargetVehicleAttributeTag, TEXT("Attr.Collision.TargetIsVehicle"));
+    const FGameplayTag ImpactScoreOutputAttributeTag = ResolveCollisionAttributeTag(HitRegisterConfig.ImpactScoreAttributeTag, TEXT("Attr.Collision.ImpactScore"));
+    const FGameplayTag ImpactTierOutputAttributeTag = ResolveCollisionAttributeTag(HitRegisterConfig.ImpactTierAttributeTag, TEXT("Attr.Collision.ImpactTier"));
+    const FGameplayTag EffectiveNormalOutputAttributeTag = ResolveCollisionAttributeTag(HitRegisterConfig.EffectiveNormalSpeedAttributeTag, TEXT("Attr.Collision.EffectiveNormalImpactSpeed"));
+
+    AddAttributeIfValid(AttackRequest.Attributes, TotalSpeedAttributeTag, TotalSpeed);
+    AddAttributeIfValid(AttackRequest.Attributes, NormalSpeedAttributeTag, NormalImpactSpeed);
+    AddAttributeIfValid(AttackRequest.Attributes, TargetSpeedAttributeTag, TargetSpeed);
+    AddAttributeIfValid(AttackRequest.Attributes, RelativeNormalSpeedAttributeTag, RelativeNormalSpeed);
+    AddAttributeIfValid(AttackRequest.Attributes, DriftingStateAttributeTag, bIsDrifting ? 1.0f : 0.0f);
+    AddAttributeIfValid(AttackRequest.Attributes, SkillDashStateAttributeTag, bIsSkillDashing ? 1.0f : 0.0f);
+    AddAttributeIfValid(AttackRequest.Attributes, TargetVehicleStateAttributeTag, bTargetIsVehicle ? 1.0f : 0.0f);
 
     FHitRegisterContext Context;
     bool bHitRegisterResult = false;
@@ -502,6 +589,9 @@ void UArcadeVehicleMovementComponent::TryEmitCollisionHitRegisterEvent(const FHi
     bLastCollisionTriggeredHitRegister = true;
     bLastCollisionHitRegisterSucceeded = bHitRegisterResult;
     LastCollisionHitRegisterWorldTime = Now;
+    LastCollisionEffectiveNormalSpeed = GetAttributeOrDefault(Context.Attack.Attributes, EffectiveNormalOutputAttributeTag, 0.0f);
+    LastCollisionImpactScore = GetAttributeOrDefault(Context.Attack.Attributes, ImpactScoreOutputAttributeTag, 0.0f);
+    LastCollisionImpactTier = ToImpactTier(GetAttributeOrDefault(Context.Attack.Attributes, ImpactTierOutputAttributeTag, 0.0f));
 
     if (bHitRegisterResult)
     {

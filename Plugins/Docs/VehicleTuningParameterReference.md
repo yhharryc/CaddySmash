@@ -1,4 +1,4 @@
-# Vehicle Tuning Parameter Reference (English)
+﻿# Vehicle Tuning Parameter Reference (English)
 
 This document covers every runtime tuning field exposed by `UCaddyVehicleTuningDataAsset`.
 Units are Unreal default (`cm`, `cm/s`, `cm/s^2`, `degrees`, `seconds`) unless stated otherwise.
@@ -46,7 +46,7 @@ Units are Unreal default (`cm`, `cm/s`, `cm/s^2`, `degrees`, `seconds`) unless s
 | `ResponseMode` | Collision response model (`SlideOnly`, `ArcadeWallGlide`). | N/A | N/A | Use `ArcadeWallGlide` for smooth arcade wall behavior. |
 | `SpeedRetainRatio` | Speed preserved after impact (0..1). | Keep momentum after hits. | Bigger speed loss on collision. | Higher for forgiving arcade flow. |
 | `MaxCollisionIterations` | Sweep/resolve loops per tick. | Better stability in corners/stacked contacts. | Cheaper but can feel stickier. | Increase if corner trapping occurs. |
-| `WallGlideVelocityInterpSpeed` | Blend speed toward glide tangent velocity. | Snappier redirection after wall contact. | Softer transition. | Avoid “frozen on wall Efeeling. |
+| `WallGlideVelocityInterpSpeed` | Blend speed toward glide tangent velocity. | Snappier redirection after wall contact. | Softer transition. | Avoid 窶彷rozen on wall窶・feeling. |
 | `WallGlideInputAssist` | Player input influence on wall glide direction. | More player control while scraping walls. | More physically neutral slide. | Keep agency during collisions. |
 | `MinNormalImpactSpeedForGlide` | Normal impact threshold for strong glide logic. | Fewer impacts trigger strong glide behavior. | More impacts trigger glide smoothing. | Control when arcade smoothing activates. |
 | `MinWallGlideSpeed` | Minimum preserved glide speed on heavy impact. | Fewer full stalls on wall hits. | Impacts can slow more aggressively. | Maintain race flow after mistakes. |
@@ -63,16 +63,23 @@ Units are Unreal default (`cm`, `cm/s`, `cm/s^2`, `degrees`, `seconds`) unless s
 | `MinSpeedForEvent` | Minimum total speed to emit event. | Fewer low-speed events. | More low-speed bumps emit events. | Filter noise in tight spaces. |
 | `MinNormalImpactSpeedForEvent` | Minimum normal impact speed to emit event. | Only stronger head-on hits trigger events. | More glancing hits can trigger. | Tune combat readability. |
 | `EventCooldownSeconds` | Per-vehicle cooldown between emitted events. | Fewer repeated spam events. | More frequent events in rapid hits. | Stabilize damage/event frequency. |
-| `BaseDamageByNormalImpactSpeed` | Damage slope vs normal impact speed. | Impact damage scales faster. | Impact damage scales slower. | Balance ramming builds. |
-| `BaseDamageBias` | Flat damage added to each emitted event. | Higher guaranteed damage floor. | More speed-dependent damage only. | Ensure collisions always “matter. E|
 | `BaseTags` | Tags always included in collision events. | N/A | N/A | Route logic in ability/effect systems. |
 | `WorldStaticTag` | Added when hitting static world. | N/A | N/A | Distinguish wall hits from actor hits. |
 | `WorldDynamicTag` | Added when hitting dynamic world objects. | N/A | N/A | Barrel/physics-object specific rules. |
 | `PawnTag` | Added when hitting a pawn. | N/A | N/A | PvP impact reactions. |
+| `VehicleTargetTag` | Added when target is another arcade vehicle. | N/A | N/A | Route vehicle-vs-vehicle specific logic. |
 | `DriftingTag` | Added when impact occurs during drift. | N/A | N/A | Drift-specific perks/skills. |
-| `SpeedAttributeTag` | Optional payload attribute for total speed. | N/A | N/A | Downstream formulas that need speed input. |
-| `NormalImpactSpeedAttributeTag` | Optional payload attribute for normal impact speed. | N/A | N/A | Distinguish scrape vs direct hit severity. |
-| `DriftingAttributeTag` | Optional payload attribute (0/1 drifting state). | N/A | N/A | Event logic with binary drift condition. |
+| `SkillDashTag` | Added when impact occurs during skill dash state. | N/A | N/A | Route dash-specific collision logic. |
+| `SpeedAttributeTag` | Raw payload attribute for total speed (fallback: `Attr.Collision.TotalSpeed`). | N/A | N/A | Input for collision adjudication node. |
+| `NormalImpactSpeedAttributeTag` | Raw payload attribute for normal impact speed (fallback: `Attr.Collision.NormalImpactSpeed`). | N/A | N/A | Direct-hit severity input. |
+| `TargetSpeedAttributeTag` | Raw payload attribute for target speed (fallback: `Attr.Collision.TargetSpeed`). | N/A | N/A | Needed for clash/speed-ratio style rules. |
+| `RelativeNormalSpeedAttributeTag` | Raw payload attribute for relative normal impact speed (fallback: `Attr.Collision.RelativeNormalImpactSpeed`). | N/A | N/A | Better vehicle-vs-vehicle impact strength input. |
+| `TargetVehicleAttributeTag` | Raw payload attribute (0/1) for whether target is vehicle (fallback: `Attr.Collision.TargetIsVehicle`). | N/A | N/A | Gate collision combat to vehicle targets. |
+| `SkillDashingAttributeTag` | Raw payload attribute (0/1) for dash state (fallback: `Attr.Collision.IsSkillDashing`). | N/A | N/A | Enable dash collision bonuses in pipeline. |
+| `DriftingAttributeTag` | Raw payload attribute (0/1) for drifting state (fallback: `Attr.Collision.IsDrifting`). | N/A | N/A | Enable drift collision bonuses in pipeline. |
+| `EffectiveNormalSpeedAttributeTag` | Pipeline output attribute for effective normal speed (fallback: `Attr.Collision.EffectiveNormalImpactSpeed`). | N/A | N/A | Debug/telemetry of adjudicated impact speed. |
+| `ImpactScoreAttributeTag` | Pipeline output attribute for impact score (fallback: `Attr.Collision.ImpactScore`). | N/A | N/A | Debug and downstream event branching. |
+| `ImpactTierAttributeTag` | Pipeline output attribute for impact tier (fallback: `Attr.Collision.ImpactTier`). | N/A | N/A | Debug and tier-based follow-up logic. |
 
 ## Camera (`FCaddyVehicleCameraConfig`)
 
@@ -92,7 +99,7 @@ Units are Unreal default (`cm`, `cm/s`, `cm/s^2`, `degrees`, `seconds`) unless s
 | `MaxLateralRollDeg` | Max camera roll from lateral slip. | Stronger cornering drama. | Flatter, calmer image. | Add arcade energy in turns. |
 | `LateralSpeedForMaxRoll` | Lateral speed needed for full roll. | Roll responds less at moderate slip. | Roll reaches max earlier. | Prevent over-roll on small corrections. |
 | `RollInterpSpeed` | Roll interpolation speed. | Faster roll reactions. | Slower, softer roll. | Tune comfort vs punchiness. |
-| `bEnableCameraLag` | Enables spring-arm location lag. | N/A | N/A | Core “weight Efeel for speed. |
+| `bEnableCameraLag` | Enables spring-arm location lag. | N/A | N/A | Core 窶忤eight窶・feel for speed. |
 | `CameraLagSpeedAtLowSpeed` | Lag speed near zero speed. | Camera catches up faster (less lag). | More low-speed float. | Keep idle maneuvering readable. |
 | `CameraLagSpeedAtHighSpeed` | Lag speed at high speed. | Camera catches up faster at speed. | More high-speed drag/weight. | Add speed weight without over-sway. |
 | `CameraLagMaxDistance` | Max allowed lag displacement. | Allows larger lag arcs. | Tighter follow behavior. | Control extreme lag artifacts. |

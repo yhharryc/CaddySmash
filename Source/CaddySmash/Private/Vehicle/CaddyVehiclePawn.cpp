@@ -23,6 +23,9 @@
 #include "Vehicle/CaddyVehicleCameraComponent.h"
 #include "Vehicle/CaddyVehicleFeelComponent.h"
 #include "Vehicle/Abilities/CaddyVehicleBrakeDashAbility.h"
+#include "Vehicle/Abilities/CaddyVehicleKnockbackAbility.h"
+#include "Vehicle/Combat/CaddyVehicleAttributeSet.h"
+#include "Vehicle/Combat/CaddyVehicleHitRegisterDamageableComponent.h"
 #include "Vehicle/CaddyVehicleSkillConfigDataAsset.h"
 #include "Vehicle/CaddyVehicleSkillComponent.h"
 #include "Vehicle/CaddyVehicleTuningDataAsset.h"
@@ -206,11 +209,17 @@ ACaddyVehiclePawn::ACaddyVehiclePawn()
     VehicleSkillComponent = CreateDefaultSubobject<UCaddyVehicleSkillComponent>(TEXT("VehicleSkillComponent"));
     VehicleSkillComponent->BindSkillRig(VehicleMovementComponent);
 
+    VehicleDamageableComponent = CreateDefaultSubobject<UCaddyVehicleHitRegisterDamageableComponent>(TEXT("VehicleDamageableComponent"));
+
     VehicleCameraComponent = CreateDefaultSubobject<UCaddyVehicleCameraComponent>(TEXT("VehicleCameraComponent"));
     VehicleCameraComponent->BindCameraRig(VehicleMovementComponent, CameraBoomComponent, TopDownCameraComponent);
 
     AbilitySystemComponent = CreateDefaultSubobject<UAbilitySystemComponent>(TEXT("AbilitySystemComponent"));
     AbilitySystemComponent->SetIsReplicated(true);
+
+    VehicleAttributeSet = CreateDefaultSubobject<UCaddyVehicleAttributeSet>(TEXT("VehicleAttributeSet"));
+
+    KnockbackAbilityClass = UCaddyVehicleKnockbackAbility::StaticClass();
 }
 
 void ACaddyVehiclePawn::BeginPlay()
@@ -237,6 +246,8 @@ void ACaddyVehiclePawn::BeginPlay()
     }
 
     GrantOrRefreshSkillAbility();
+    GrantOrRefreshKnockbackAbility();
+    InitializeVehicleAttributes();
 
     if (RuntimeTuningPresets.Num() > 0)
     {
@@ -254,6 +265,7 @@ void ACaddyVehiclePawn::BeginPlay()
 void ACaddyVehiclePawn::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
     ClearGrantedSkillAbility();
+    ClearGrantedKnockbackAbility();
 
     if (DefaultInputMappingContext)
     {
@@ -283,6 +295,8 @@ void ACaddyVehiclePawn::PossessedBy(AController* NewController)
     }
 
     GrantOrRefreshSkillAbility();
+    GrantOrRefreshKnockbackAbility();
+    InitializeVehicleAttributes();
     InitializeEnhancedInputMapping();
 }
 
@@ -295,6 +309,7 @@ void ACaddyVehiclePawn::OnRep_Controller()
         AbilitySystemComponent->InitAbilityActorInfo(this, this);
     }
 
+    InitializeVehicleAttributes();
     InitializeEnhancedInputMapping();
 }
 
@@ -377,6 +392,33 @@ UAbilitySystemComponent* ACaddyVehiclePawn::GetAbilitySystemComponent() const
     return AbilitySystemComponent;
 }
 
+float ACaddyVehiclePawn::GetVehicleHealth() const
+{
+    if (AbilitySystemComponent)
+    {
+        return AbilitySystemComponent->GetNumericAttribute(UCaddyVehicleAttributeSet::GetHealthAttribute());
+    }
+    return VehicleAttributeSet ? VehicleAttributeSet->GetHealth() : 0.0f;
+}
+
+float ACaddyVehiclePawn::GetVehicleMaxHealth() const
+{
+    if (AbilitySystemComponent)
+    {
+        return AbilitySystemComponent->GetNumericAttribute(UCaddyVehicleAttributeSet::GetMaxHealthAttribute());
+    }
+    return VehicleAttributeSet ? VehicleAttributeSet->GetMaxHealth() : 0.0f;
+}
+
+float ACaddyVehiclePawn::GetVehicleKnockbackResistance() const
+{
+    if (AbilitySystemComponent)
+    {
+        return AbilitySystemComponent->GetNumericAttribute(UCaddyVehicleAttributeSet::GetKnockbackResistanceAttribute());
+    }
+    return VehicleAttributeSet ? VehicleAttributeSet->GetKnockbackResistance() : 0.0f;
+}
+
 void ACaddyVehiclePawn::GrantOrRefreshSkillAbility()
 {
     if (!HasAuthority() || !AbilitySystemComponent)
@@ -419,6 +461,59 @@ void ACaddyVehiclePawn::ClearGrantedSkillAbility()
 
     AbilitySystemComponent->ClearAbility(SkillAbilitySpecHandle);
     SkillAbilitySpecHandle = FGameplayAbilitySpecHandle();
+}
+
+void ACaddyVehiclePawn::GrantOrRefreshKnockbackAbility()
+{
+    if (!HasAuthority() || !AbilitySystemComponent)
+    {
+        return;
+    }
+
+    if (KnockbackAbilitySpecHandle.IsValid())
+    {
+        AbilitySystemComponent->ClearAbility(KnockbackAbilitySpecHandle);
+        KnockbackAbilitySpecHandle = FGameplayAbilitySpecHandle();
+    }
+
+    TSubclassOf<UGameplayAbility> AbilityClass = KnockbackAbilityClass;
+    if (!AbilityClass)
+    {
+        AbilityClass = UCaddyVehicleKnockbackAbility::StaticClass();
+    }
+    if (!AbilityClass)
+    {
+        return;
+    }
+
+    FGameplayAbilitySpec AbilitySpec(AbilityClass, 1, INDEX_NONE, this);
+    KnockbackAbilitySpecHandle = AbilitySystemComponent->GiveAbility(AbilitySpec);
+}
+
+void ACaddyVehiclePawn::ClearGrantedKnockbackAbility()
+{
+    if (!HasAuthority() || !AbilitySystemComponent || !KnockbackAbilitySpecHandle.IsValid())
+    {
+        return;
+    }
+
+    AbilitySystemComponent->ClearAbility(KnockbackAbilitySpecHandle);
+    KnockbackAbilitySpecHandle = FGameplayAbilitySpecHandle();
+}
+
+void ACaddyVehiclePawn::InitializeVehicleAttributes()
+{
+    if (!HasAuthority() || !AbilitySystemComponent)
+    {
+        return;
+    }
+
+    const float MaxHealth = FMath::Max(1.0f, DefaultMaxHealth);
+    AbilitySystemComponent->SetNumericAttributeBase(UCaddyVehicleAttributeSet::GetMaxHealthAttribute(), MaxHealth);
+    AbilitySystemComponent->SetNumericAttributeBase(UCaddyVehicleAttributeSet::GetHealthAttribute(), MaxHealth);
+    AbilitySystemComponent->SetNumericAttributeBase(
+        UCaddyVehicleAttributeSet::GetKnockbackResistanceAttribute(),
+        FMath::Clamp(DefaultKnockbackResistance, 0.0f, 0.95f));
 }
 
 bool ACaddyVehiclePawn::TryActivateSkillAbility()
