@@ -4,6 +4,7 @@
 #include "GameFramework/Pawn.h"
 #include "TimerManager.h"
 #include "Vehicle/ArcadeVehicleMovementComponent.h"
+#include "Vehicle/Abilities/Targeting/CaddyVehicleSkillTargetActor_Trace.h"
 #include "Vehicle/CaddyVehicleSkillComponent.h"
 
 UCaddyVehicleBrakeDashAbility::UCaddyVehicleBrakeDashAbility()
@@ -74,6 +75,9 @@ void UCaddyVehicleBrakeDashAbility::ActivateAbility(
         return;
     }
 
+    DestroySkillTargetActor();
+    CachedTargetDataHandle.Clear();
+
     SkillComponent->SkillState = ECaddyVehicleSkillState::Ready;
     SkillComponent->StateElapsedSeconds = 0.0f;
     SkillComponent->TriggerHoldSeconds = 0.0f;
@@ -110,6 +114,8 @@ void UCaddyVehicleBrakeDashAbility::EndAbility(
     {
         World->GetTimerManager().ClearTimer(SkillTickTimerHandle);
     }
+    DestroySkillTargetActor();
+    CachedTargetDataHandle.Clear();
 
     if (bWasCancelled)
     {
@@ -193,6 +199,224 @@ float UCaddyVehicleBrakeDashAbility::ComputeDeltaTime()
     return DeltaTime;
 }
 
+ACaddyVehicleSkillTargetActor_Trace* UCaddyVehicleBrakeDashAbility::GetOrCreateSkillTargetActor()
+{
+    if (ACaddyVehicleSkillTargetActor_Trace* ExistingTargetActor = SkillTargetActor.Get())
+    {
+        return ExistingTargetActor;
+    }
+
+    if (!ResolveSkillRig(false))
+    {
+        return nullptr;
+    }
+
+    UWorld* World = GetWorld();
+    APawn* Pawn = CachedPawn.Get();
+    if (!World || !Pawn)
+    {
+        return nullptr;
+    }
+
+    FActorSpawnParameters SpawnParams;
+    SpawnParams.Owner = Pawn;
+    SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+    ACaddyVehicleSkillTargetActor_Trace* TargetActor = World->SpawnActor<ACaddyVehicleSkillTargetActor_Trace>(
+        ACaddyVehicleSkillTargetActor_Trace::StaticClass(),
+        Pawn->GetActorLocation(),
+        FRotator::ZeroRotator,
+        SpawnParams);
+    if (!TargetActor)
+    {
+        return nullptr;
+    }
+
+    TargetActor->SetActorHiddenInGame(true);
+    TargetActor->StartTargeting(this);
+    TargetActor->TargetDataReadyDelegate.AddUObject(this, &UCaddyVehicleBrakeDashAbility::HandleSkillTargetDataReady);
+    SkillTargetActor = TargetActor;
+    return TargetActor;
+}
+
+void UCaddyVehicleBrakeDashAbility::DestroySkillTargetActor()
+{
+    if (ACaddyVehicleSkillTargetActor_Trace* TargetActor = SkillTargetActor.Get())
+    {
+        TargetActor->TargetDataReadyDelegate.RemoveAll(this);
+        TargetActor->Destroy();
+    }
+    SkillTargetActor = nullptr;
+}
+
+void UCaddyVehicleBrakeDashAbility::HandleSkillTargetDataReady(const FGameplayAbilityTargetDataHandle& DataHandle)
+{
+    CachedTargetDataHandle = DataHandle;
+}
+
+void UCaddyVehicleBrakeDashAbility::RefreshTargetDataFromGAS()
+{
+    UCaddyVehicleSkillComponent* SkillComponent = CachedSkillComponent.Get();
+    UArcadeVehicleMovementComponent* MovementComponent = CachedMovement.Get();
+    if (!SkillComponent || !MovementComponent)
+    {
+        CachedTargetDataHandle.Clear();
+        return;
+    }
+
+    const FCaddyVehicleSkillAbilityTargetingConfig& TargetingConfig = SkillComponent->BrakeDashConfig.AbilityTargeting;
+    if (!TargetingConfig.bEnableAbilityTargeting)
+    {
+        CachedTargetDataHandle.Clear();
+        return;
+    }
+
+    ACaddyVehicleSkillTargetActor_Trace* TargetActor = GetOrCreateSkillTargetActor();
+    if (!TargetActor)
+    {
+        CachedTargetDataHandle.Clear();
+        return;
+    }
+
+    FVector2D AimHint = FVector2D::ZeroVector;
+    if (MovementComponent->HasMoveIntent())
+    {
+        const FVector2D MoveIntent = MovementComponent->GetMoveIntent();
+        if (MoveIntent.SizeSquared() >= FMath::Square(SkillComponent->BrakeDashConfig.AimInputDeadZone))
+        {
+            AimHint = MoveIntent.GetSafeNormal();
+        }
+    }
+    if (AimHint.IsNearlyZero())
+    {
+        AimHint = SkillComponent->CurrentAimDirection.IsNearlyZero()
+            ? SkillComponent->ResolveFallbackAimDirection()
+            : SkillComponent->CurrentAimDirection;
+    }
+
+    TargetActor->Configure(
+        TargetingConfig.TraceDistance,
+        TargetingConfig.TraceRadius,
+        TargetingConfig.TraceChannel,
+        TargetingConfig.TargetingProfile.Get(),
+        TargetingConfig.bEnableDebugDraw,
+        TargetingConfig.DebugPersistSeconds);
+    TargetActor->SetAimDirectionHint2D(AimHint);
+
+    CachedTargetDataHandle.Clear();
+    TargetActor->ConfirmTargetingAndContinue();
+}
+
+void UCaddyVehicleBrakeDashAbility::ResolveAndApplyAimDirection()
+{
+    UCaddyVehicleSkillComponent* SkillComponent = CachedSkillComponent.Get();
+    UArcadeVehicleMovementComponent* MovementComponent = CachedMovement.Get();
+    APawn* Pawn = CachedPawn.Get();
+    if (!SkillComponent || !MovementComponent || !Pawn)
+    {
+        return;
+    }
+
+    FVector2D InputAim = FVector2D::ZeroVector;
+    const bool bHasInputAim = MovementComponent->HasMoveIntent()
+        && MovementComponent->GetMoveIntent().SizeSquared() >= FMath::Square(SkillComponent->BrakeDashConfig.AimInputDeadZone);
+    if (bHasInputAim)
+    {
+        InputAim = MovementComponent->GetMoveIntent().GetSafeNormal();
+    }
+
+    FVector2D AbilityTargetAim = FVector2D::ZeroVector;
+    AActor* AbilityTargetActor = nullptr;
+    FVector AbilityTargetLocation = FVector::ZeroVector;
+    bool bHasAbilityTargetAim = false;
+
+    if (SkillComponent->BrakeDashConfig.AbilityTargeting.bEnableAbilityTargeting)
+    {
+        RefreshTargetDataFromGAS();
+
+        if (const FGameplayAbilityTargetData* TargetData = CachedTargetDataHandle.Get(0))
+        {
+            const FHitResult* HitResult = TargetData->GetHitResult();
+            if (HitResult)
+            {
+                AbilityTargetActor = HitResult->GetActor();
+                AbilityTargetLocation = HitResult->ImpactPoint.IsNearlyZero() ? HitResult->Location : HitResult->ImpactPoint;
+            }
+            else
+            {
+                const TArray<TWeakObjectPtr<AActor>> TargetActors = TargetData->GetActors();
+                if (TargetActors.Num() > 0 && TargetActors[0].IsValid())
+                {
+                    AbilityTargetActor = TargetActors[0].Get();
+                    AbilityTargetLocation = AbilityTargetActor->GetActorLocation();
+                }
+            }
+        }
+
+        if (!AbilityTargetLocation.IsNearlyZero())
+        {
+            FVector ToTarget = AbilityTargetLocation - Pawn->GetActorLocation();
+            ToTarget.Z = 0.0f;
+            if (!ToTarget.IsNearlyZero())
+            {
+                AbilityTargetAim = FVector2D(ToTarget.X, ToTarget.Y).GetSafeNormal();
+                bHasAbilityTargetAim = !AbilityTargetAim.IsNearlyZero();
+            }
+        }
+    }
+
+    bool bSelectedAbilityTargetAim = false;
+    FVector2D SelectedAim = SkillComponent->CurrentAimDirection;
+    switch (SkillComponent->BrakeDashConfig.AbilityTargeting.AimSelectionMode)
+    {
+    case ECaddyVehicleSkillAimSelectionMode::InputOnly:
+        if (bHasInputAim)
+        {
+            SelectedAim = InputAim;
+        }
+        break;
+    case ECaddyVehicleSkillAimSelectionMode::AbilityTargetOnly:
+        if (bHasAbilityTargetAim)
+        {
+            SelectedAim = AbilityTargetAim;
+            bSelectedAbilityTargetAim = true;
+        }
+        break;
+    case ECaddyVehicleSkillAimSelectionMode::AbilityTargetPreferInputFallback:
+    default:
+        if (bHasAbilityTargetAim)
+        {
+            SelectedAim = AbilityTargetAim;
+            bSelectedAbilityTargetAim = true;
+        }
+        else if (bHasInputAim)
+        {
+            SelectedAim = InputAim;
+        }
+        break;
+    }
+
+    if (SelectedAim.IsNearlyZero())
+    {
+        SelectedAim = SkillComponent->ResolveFallbackAimDirection();
+    }
+    SkillComponent->CurrentAimDirection = SelectedAim.IsNearlyZero()
+        ? FVector2D(1.0f, 0.0f)
+        : SelectedAim.GetSafeNormal();
+
+    if (bSelectedAbilityTargetAim)
+    {
+        SkillComponent->bUsingAbilityTargetAim = true;
+        SkillComponent->CurrentAbilityTargetActor = AbilityTargetActor;
+        SkillComponent->CurrentAbilityTargetLocation = AbilityTargetLocation;
+    }
+    else
+    {
+        SkillComponent->bUsingAbilityTargetAim = false;
+        SkillComponent->CurrentAbilityTargetActor = nullptr;
+        SkillComponent->CurrentAbilityTargetLocation = FVector::ZeroVector;
+    }
+}
+
 void UCaddyVehicleBrakeDashAbility::TickSkillStateMachine()
 {
     if (!IsActive())
@@ -262,7 +486,7 @@ void UCaddyVehicleBrakeDashAbility::TickSkillStateMachine()
     {
     case ECaddyVehicleSkillState::Braking:
     {
-        SkillComponent->UpdateAimDirection();
+        ResolveAndApplyAimDirection();
         SkillComponent->RotateOwnerTowardCurrentAim(DeltaTime);
 
         const float BrakeDuration = FMath::Max(0.01f, SkillComponent->BrakeDashConfig.BrakeDuration);
@@ -280,7 +504,7 @@ void UCaddyVehicleBrakeDashAbility::TickSkillStateMachine()
     }
     case ECaddyVehicleSkillState::Charging:
     {
-        SkillComponent->UpdateAimDirection();
+        ResolveAndApplyAimDirection();
         SkillComponent->RotateOwnerTowardCurrentAim(DeltaTime);
 
         SkillComponent->CurrentChargeSeconds = FMath::Clamp(
@@ -339,7 +563,7 @@ void UCaddyVehicleBrakeDashAbility::EnterBrakePhase()
     SkillComponent->ActiveDashDuration = 0.0f;
     SkillComponent->ActiveDashPeakSpeed = 0.0f;
 
-    SkillComponent->UpdateAimDirection();
+    ResolveAndApplyAimDirection();
     if (SkillComponent->CurrentAimDirection.IsNearlyZero())
     {
         SkillComponent->CurrentAimDirection = SkillComponent->ResolveFallbackAimDirection();
@@ -387,7 +611,7 @@ void UCaddyVehicleBrakeDashAbility::EnterDashPhase()
         return;
     }
 
-    SkillComponent->UpdateAimDirection();
+    ResolveAndApplyAimDirection();
     SkillComponent->DashDirection = SkillComponent->CurrentAimDirection.IsNearlyZero()
         ? SkillComponent->ResolveFallbackAimDirection()
         : SkillComponent->CurrentAimDirection.GetSafeNormal();
@@ -472,4 +696,3 @@ void UCaddyVehicleBrakeDashAbility::AbortToReady()
     SkillComponent->CurrentAbilityTargetActor = nullptr;
     SkillComponent->CurrentAbilityTargetLocation = FVector::ZeroVector;
 }
-

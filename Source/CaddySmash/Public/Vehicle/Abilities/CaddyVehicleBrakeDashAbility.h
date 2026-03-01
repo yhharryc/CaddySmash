@@ -2,11 +2,13 @@
 
 #include "CoreMinimal.h"
 #include "Abilities/GameplayAbility.h"
+#include "Abilities/GameplayAbilityTargetTypes.h"
 #include "CaddyVehicleBrakeDashAbility.generated.h"
 
 class APawn;
 class UArcadeVehicleMovementComponent;
 class UCaddyVehicleSkillComponent;
+class ACaddyVehicleSkillTargetActor_Trace;
 
 UCLASS()
 class CADDYSMASH_API UCaddyVehicleBrakeDashAbility : public UGameplayAbility
@@ -41,6 +43,11 @@ private:
     bool ResolveSkillRig(bool bLogFailures) const;
     bool IsTriggerSourceHeld() const;
     float ComputeDeltaTime();
+    void ResolveAndApplyAimDirection();
+    void RefreshTargetDataFromGAS();
+    void HandleSkillTargetDataReady(const FGameplayAbilityTargetDataHandle& DataHandle);
+    ACaddyVehicleSkillTargetActor_Trace* GetOrCreateSkillTargetActor();
+    void DestroySkillTargetActor();
     void TickSkillStateMachine();
     void EnterBrakePhase();
     void EnterChargingPhase();
@@ -51,8 +58,9 @@ private:
     mutable TWeakObjectPtr<APawn> CachedPawn;
     mutable TWeakObjectPtr<UArcadeVehicleMovementComponent> CachedMovement;
     mutable TWeakObjectPtr<UCaddyVehicleSkillComponent> CachedSkillComponent;
+    TWeakObjectPtr<ACaddyVehicleSkillTargetActor_Trace> SkillTargetActor;
+    FGameplayAbilityTargetDataHandle CachedTargetDataHandle;
 
     FTimerHandle SkillTickTimerHandle;
     double LastTickTimeSeconds = 0.0;
 };
-
