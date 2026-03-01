@@ -14,6 +14,7 @@ public class CaddySmash : ModuleRules
 			"CoreUObject",
 			"Engine",
 			"InputCore",
+			"EnhancedInput",
 			"GameplayAbilities",
 			"GameplayTags",
 			"GameplayTasks"
@@ -22,7 +23,8 @@ public class CaddySmash : ModuleRules
 		PrivateDependencyModuleNames.AddRange(new string[]
 		{
 			"DebugFrameworkCore",
-			"HitRegisterCore"
+			"HitRegisterCore",
+			"HitRegisterCollision"
 		});
 
 		// Uncomment if you are using Slate UI

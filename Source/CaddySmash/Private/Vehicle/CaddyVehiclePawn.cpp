@@ -1,6 +1,7 @@
 #include "Vehicle/CaddyVehiclePawn.h"
 
 #include "AbilitySystemComponent.h"
+#include "Abilities/GameplayAbility.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/InputComponent.h"
@@ -10,6 +11,10 @@
 #include "Engine/CollisionProfile.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
+#include "EnhancedInputComponent.h"
+#include "EnhancedInputSubsystems.h"
+#include "InputAction.h"
+#include "InputActionValue.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "HAL/IConsoleManager.h"
@@ -17,6 +22,9 @@
 #include "Vehicle/ArcadeVehicleMovementComponent.h"
 #include "Vehicle/CaddyVehicleCameraComponent.h"
 #include "Vehicle/CaddyVehicleFeelComponent.h"
+#include "Vehicle/Abilities/CaddyVehicleBrakeDashAbility.h"
+#include "Vehicle/CaddyVehicleSkillConfigDataAsset.h"
+#include "Vehicle/CaddyVehicleSkillComponent.h"
 #include "Vehicle/CaddyVehicleTuningDataAsset.h"
 
 namespace CaddyInputNames
@@ -195,6 +203,9 @@ ACaddyVehiclePawn::ACaddyVehiclePawn()
     VehicleFeelComponent = CreateDefaultSubobject<UCaddyVehicleFeelComponent>(TEXT("VehicleFeelComponent"));
     VehicleFeelComponent->BindFeelRig(VehicleMovementComponent, VehicleMeshComponent);
 
+    VehicleSkillComponent = CreateDefaultSubobject<UCaddyVehicleSkillComponent>(TEXT("VehicleSkillComponent"));
+    VehicleSkillComponent->BindSkillRig(VehicleMovementComponent);
+
     VehicleCameraComponent = CreateDefaultSubobject<UCaddyVehicleCameraComponent>(TEXT("VehicleCameraComponent"));
     VehicleCameraComponent->BindCameraRig(VehicleMovementComponent, CameraBoomComponent, TopDownCameraComponent);
 
@@ -216,6 +227,17 @@ void ACaddyVehiclePawn::BeginPlay()
         VehicleCameraComponent->BindCameraRig(VehicleMovementComponent, CameraBoomComponent, TopDownCameraComponent);
     }
 
+    if (VehicleSkillComponent)
+    {
+        VehicleSkillComponent->BindSkillRig(VehicleMovementComponent);
+        if (SkillConfigDataAsset)
+        {
+            VehicleSkillComponent->SetSkillConfig(SkillConfigDataAsset->BrakeDashConfig, false);
+        }
+    }
+
+    GrantOrRefreshSkillAbility();
+
     if (RuntimeTuningPresets.Num() > 0)
     {
         const int32 ClampedInitialIndex = FMath::Clamp(ActiveRuntimeTuningPresetIndex, 0, RuntimeTuningPresets.Num() - 1);
@@ -226,10 +248,27 @@ void ACaddyVehiclePawn::BeginPlay()
     }
 
     RegisterDebugProviders();
+    InitializeEnhancedInputMapping();
 }
 
 void ACaddyVehiclePawn::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+    ClearGrantedSkillAbility();
+
+    if (DefaultInputMappingContext)
+    {
+        if (APlayerController* PlayerController = Cast<APlayerController>(GetController()))
+        {
+            if (ULocalPlayer* LocalPlayer = PlayerController->GetLocalPlayer())
+            {
+                if (UEnhancedInputLocalPlayerSubsystem* InputSubsystem = LocalPlayer->GetSubsystem<UEnhancedInputLocalPlayerSubsystem>())
+                {
+                    InputSubsystem->RemoveMappingContext(DefaultInputMappingContext);
+                }
+            }
+        }
+    }
+
     UnregisterDebugProviders();
     Super::EndPlay(EndPlayReason);
 }
@@ -242,6 +281,9 @@ void ACaddyVehiclePawn::PossessedBy(AController* NewController)
     {
         AbilitySystemComponent->InitAbilityActorInfo(this, this);
     }
+
+    GrantOrRefreshSkillAbility();
+    InitializeEnhancedInputMapping();
 }
 
 void ACaddyVehiclePawn::OnRep_Controller()
@@ -252,17 +294,77 @@ void ACaddyVehiclePawn::OnRep_Controller()
     {
         AbilitySystemComponent->InitAbilityActorInfo(this, this);
     }
+
+    InitializeEnhancedInputMapping();
 }
 
 void ACaddyVehiclePawn::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
     check(PlayerInputComponent);
 
-    PlayerInputComponent->BindAxis(CaddyInputNames::MoveX, this, &ACaddyVehiclePawn::InputMoveX);
-    PlayerInputComponent->BindAxis(CaddyInputNames::MoveY, this, &ACaddyVehiclePawn::InputMoveY);
-    PlayerInputComponent->BindAxis(CaddyInputNames::Accelerate, this, &ACaddyVehiclePawn::InputAccelerate);
-    PlayerInputComponent->BindAxis(CaddyInputNames::BrakeReverse, this, &ACaddyVehiclePawn::InputBrakeReverse);
-    PlayerInputComponent->BindAxis(CaddyInputNames::Drift, this, &ACaddyVehiclePawn::InputDrift);
+    bool bEnhancedMoveBound = false;
+    bool bEnhancedAccelerateBound = false;
+    bool bEnhancedBrakeBound = false;
+    bool bEnhancedDriftBound = false;
+
+    if (UEnhancedInputComponent* EnhancedInput = Cast<UEnhancedInputComponent>(PlayerInputComponent))
+    {
+        if (MoveInputAction)
+        {
+            EnhancedInput->BindAction(MoveInputAction, ETriggerEvent::Triggered, this, &ACaddyVehiclePawn::InputMoveAction);
+            EnhancedInput->BindAction(MoveInputAction, ETriggerEvent::Completed, this, &ACaddyVehiclePawn::InputMoveAction);
+            bEnhancedMoveBound = true;
+        }
+
+        if (AccelerateInputAction)
+        {
+            EnhancedInput->BindAction(AccelerateInputAction, ETriggerEvent::Triggered, this, &ACaddyVehiclePawn::InputAccelerateAction);
+            EnhancedInput->BindAction(AccelerateInputAction, ETriggerEvent::Completed, this, &ACaddyVehiclePawn::InputAccelerateAction);
+            bEnhancedAccelerateBound = true;
+        }
+
+        if (BrakeReverseInputAction)
+        {
+            EnhancedInput->BindAction(BrakeReverseInputAction, ETriggerEvent::Triggered, this, &ACaddyVehiclePawn::InputBrakeReverseAction);
+            EnhancedInput->BindAction(BrakeReverseInputAction, ETriggerEvent::Completed, this, &ACaddyVehiclePawn::InputBrakeReverseAction);
+            bEnhancedBrakeBound = true;
+        }
+
+        if (DriftInputAction)
+        {
+            EnhancedInput->BindAction(DriftInputAction, ETriggerEvent::Triggered, this, &ACaddyVehiclePawn::InputDriftAction);
+            EnhancedInput->BindAction(DriftInputAction, ETriggerEvent::Completed, this, &ACaddyVehiclePawn::InputDriftAction);
+            bEnhancedDriftBound = true;
+        }
+
+        if (SkillInputAction)
+        {
+            EnhancedInput->BindAction(SkillInputAction, ETriggerEvent::Started, this, &ACaddyVehiclePawn::InputSkillStartedAction);
+            EnhancedInput->BindAction(SkillInputAction, ETriggerEvent::Completed, this, &ACaddyVehiclePawn::InputSkillCompletedAction);
+            EnhancedInput->BindAction(SkillInputAction, ETriggerEvent::Canceled, this, &ACaddyVehiclePawn::InputSkillCompletedAction);
+        }
+    }
+
+    if (!bEnhancedMoveBound)
+    {
+        PlayerInputComponent->BindAxis(CaddyInputNames::MoveX, this, &ACaddyVehiclePawn::InputMoveX);
+        PlayerInputComponent->BindAxis(CaddyInputNames::MoveY, this, &ACaddyVehiclePawn::InputMoveY);
+    }
+
+    if (!bEnhancedAccelerateBound)
+    {
+        PlayerInputComponent->BindAxis(CaddyInputNames::Accelerate, this, &ACaddyVehiclePawn::InputAccelerate);
+    }
+
+    if (!bEnhancedBrakeBound)
+    {
+        PlayerInputComponent->BindAxis(CaddyInputNames::BrakeReverse, this, &ACaddyVehiclePawn::InputBrakeReverse);
+    }
+
+    if (!bEnhancedDriftBound)
+    {
+        PlayerInputComponent->BindAxis(CaddyInputNames::Drift, this, &ACaddyVehiclePawn::InputDrift);
+    }
 }
 
 UPawnMovementComponent* ACaddyVehiclePawn::GetMovementComponent() const
@@ -273,6 +375,91 @@ UPawnMovementComponent* ACaddyVehiclePawn::GetMovementComponent() const
 UAbilitySystemComponent* ACaddyVehiclePawn::GetAbilitySystemComponent() const
 {
     return AbilitySystemComponent;
+}
+
+void ACaddyVehiclePawn::GrantOrRefreshSkillAbility()
+{
+    if (!HasAuthority() || !AbilitySystemComponent)
+    {
+        return;
+    }
+
+    if (SkillAbilitySpecHandle.IsValid())
+    {
+        AbilitySystemComponent->ClearAbility(SkillAbilitySpecHandle);
+        SkillAbilitySpecHandle = FGameplayAbilitySpecHandle();
+    }
+
+    TSubclassOf<UGameplayAbility> SkillAbilityClass = nullptr;
+    if (SkillConfigDataAsset && SkillConfigDataAsset->SkillAbilityClass)
+    {
+        SkillAbilityClass = SkillConfigDataAsset->SkillAbilityClass;
+    }
+
+    if (!SkillAbilityClass)
+    {
+        SkillAbilityClass = UCaddyVehicleBrakeDashAbility::StaticClass();
+    }
+
+    if (!SkillAbilityClass)
+    {
+        return;
+    }
+
+    FGameplayAbilitySpec SkillSpec(SkillAbilityClass, 1, INDEX_NONE, this);
+    SkillAbilitySpecHandle = AbilitySystemComponent->GiveAbility(SkillSpec);
+}
+
+void ACaddyVehiclePawn::ClearGrantedSkillAbility()
+{
+    if (!HasAuthority() || !AbilitySystemComponent || !SkillAbilitySpecHandle.IsValid())
+    {
+        return;
+    }
+
+    AbilitySystemComponent->ClearAbility(SkillAbilitySpecHandle);
+    SkillAbilitySpecHandle = FGameplayAbilitySpecHandle();
+}
+
+bool ACaddyVehiclePawn::TryActivateSkillAbility()
+{
+    if (!AbilitySystemComponent || !VehicleSkillComponent || !VehicleSkillComponent->bUseGASAbilityStateMachine)
+    {
+        return false;
+    }
+
+    if (SkillAbilitySpecHandle.IsValid())
+    {
+        return AbilitySystemComponent->TryActivateAbility(SkillAbilitySpecHandle, false);
+    }
+
+    TSubclassOf<UGameplayAbility> SkillAbilityClass = nullptr;
+    if (SkillConfigDataAsset && SkillConfigDataAsset->SkillAbilityClass)
+    {
+        SkillAbilityClass = SkillConfigDataAsset->SkillAbilityClass;
+    }
+    if (!SkillAbilityClass)
+    {
+        SkillAbilityClass = UCaddyVehicleBrakeDashAbility::StaticClass();
+    }
+
+    return SkillAbilityClass ? AbilitySystemComponent->TryActivateAbilityByClass(SkillAbilityClass, false) : false;
+}
+
+bool ACaddyVehiclePawn::IsSkillComboTriggerHeld() const
+{
+    if (!VehicleSkillComponent || !VehicleMovementComponent)
+    {
+        return false;
+    }
+
+    if (VehicleSkillComponent->BrakeDashConfig.TriggerMode != ECaddyVehicleSkillTriggerMode::BrakeThrottleCombo)
+    {
+        return false;
+    }
+
+    return VehicleMovementComponent->GetThrottleInput() >= VehicleSkillComponent->BrakeDashConfig.TriggerThrottleThreshold
+        && VehicleMovementComponent->GetBrakeReverseInput() >= VehicleSkillComponent->BrakeDashConfig.TriggerBrakeThreshold;
 }
 
 void ACaddyVehiclePawn::SetMoveIntentInput(const FVector2D& InMoveIntentInput)
@@ -299,6 +486,11 @@ void ACaddyVehiclePawn::SetThrottleInput(float InThrottle)
     }
 
     VehicleMovementComponent->SetThrottleInput(InThrottle);
+    if (IsSkillComboTriggerHeld())
+    {
+        TryActivateSkillAbility();
+    }
+
     if (!HasAuthority())
     {
         ServerSetThrottleInput(InThrottle);
@@ -327,6 +519,11 @@ void ACaddyVehiclePawn::SetBrakeReverseInput(float InBrakeReverse)
     }
 
     VehicleMovementComponent->SetBrakeReverseInput(InBrakeReverse);
+    if (IsSkillComboTriggerHeld())
+    {
+        TryActivateSkillAbility();
+    }
+
     if (!HasAuthority())
     {
         ServerSetBrakeReverseInput(InBrakeReverse);
@@ -412,6 +609,10 @@ void ACaddyVehiclePawn::ServerSetThrottleInput_Implementation(float InThrottle)
     if (VehicleMovementComponent)
     {
         VehicleMovementComponent->SetThrottleInput(InThrottle);
+        if (IsSkillComboTriggerHeld())
+        {
+            TryActivateSkillAbility();
+        }
     }
 }
 
@@ -423,11 +624,27 @@ void ACaddyVehiclePawn::ServerSetDriftInput_Implementation(float InDrift)
     }
 }
 
+void ACaddyVehiclePawn::ServerSetSkillInputPressed_Implementation(bool bPressed)
+{
+    if (VehicleSkillComponent)
+    {
+        VehicleSkillComponent->SetSkillInputPressed(bPressed);
+        if (bPressed)
+        {
+            TryActivateSkillAbility();
+        }
+    }
+}
+
 void ACaddyVehiclePawn::ServerSetBrakeReverseInput_Implementation(float InBrakeReverse)
 {
     if (VehicleMovementComponent)
     {
         VehicleMovementComponent->SetBrakeReverseInput(InBrakeReverse);
+        if (IsSkillComboTriggerHeld())
+        {
+            TryActivateSkillAbility();
+        }
     }
 }
 
@@ -461,6 +678,81 @@ void ACaddyVehiclePawn::InputBrakeReverse(float Value)
 void ACaddyVehiclePawn::InputDrift(float Value)
 {
     SetDriftInput(FMath::Clamp(Value, 0.0f, 1.0f));
+}
+
+void ACaddyVehiclePawn::InputMoveAction(const FInputActionValue& Value)
+{
+    const FVector2D MoveValue = Value.Get<FVector2D>();
+    RawMoveInput = FVector2D(
+        FMath::Clamp(MoveValue.X, -1.0f, 1.0f),
+        FMath::Clamp(MoveValue.Y, -1.0f, 1.0f));
+    SetMoveIntentInput(RawMoveInput);
+}
+
+void ACaddyVehiclePawn::InputAccelerateAction(const FInputActionValue& Value)
+{
+    SetThrottleInput(FMath::Clamp(Value.Get<float>(), 0.0f, 1.0f));
+}
+
+void ACaddyVehiclePawn::InputBrakeReverseAction(const FInputActionValue& Value)
+{
+    SetBrakeReverseInput(FMath::Clamp(Value.Get<float>(), 0.0f, 1.0f));
+}
+
+void ACaddyVehiclePawn::InputDriftAction(const FInputActionValue& Value)
+{
+    SetDriftInput(FMath::Clamp(Value.Get<float>(), 0.0f, 1.0f));
+}
+
+void ACaddyVehiclePawn::InputSkillStartedAction(const FInputActionValue& Value)
+{
+    (void)Value;
+    if (VehicleSkillComponent)
+    {
+        VehicleSkillComponent->SetSkillInputPressed(true);
+        TryActivateSkillAbility();
+        if (!HasAuthority())
+        {
+            ServerSetSkillInputPressed(true);
+        }
+    }
+}
+
+void ACaddyVehiclePawn::InputSkillCompletedAction(const FInputActionValue& Value)
+{
+    (void)Value;
+    if (VehicleSkillComponent)
+    {
+        VehicleSkillComponent->SetSkillInputPressed(false);
+        if (!HasAuthority())
+        {
+            ServerSetSkillInputPressed(false);
+        }
+    }
+}
+
+void ACaddyVehiclePawn::InitializeEnhancedInputMapping()
+{
+    APlayerController* PlayerController = Cast<APlayerController>(GetController());
+    if (!PlayerController || !PlayerController->IsLocalController() || !DefaultInputMappingContext)
+    {
+        return;
+    }
+
+    ULocalPlayer* LocalPlayer = PlayerController->GetLocalPlayer();
+    if (!LocalPlayer)
+    {
+        return;
+    }
+
+    UEnhancedInputLocalPlayerSubsystem* InputSubsystem = LocalPlayer->GetSubsystem<UEnhancedInputLocalPlayerSubsystem>();
+    if (!InputSubsystem)
+    {
+        return;
+    }
+
+    InputSubsystem->RemoveMappingContext(DefaultInputMappingContext);
+    InputSubsystem->AddMappingContext(DefaultInputMappingContext, InputMappingPriority);
 }
 
 FVector2D ACaddyVehiclePawn::ComputeWorldMoveIntent(const FVector2D& InRawMoveInput) const
@@ -527,9 +819,10 @@ void ACaddyVehiclePawn::RegisterDebugProviders()
     AddProvider(TEXT("Vehicle.Input"), NSLOCTEXT("CaddyVehicleDebug", "InputPanelTitle", "Input"), 20, ECaddyVehicleDebugPanelType::Input);
     AddProvider(TEXT("Vehicle.Tuning"), NSLOCTEXT("CaddyVehicleDebug", "TuningPanelTitle", "Tuning"), 30, ECaddyVehicleDebugPanelType::Tuning);
     AddProvider(TEXT("Vehicle.Feel"), NSLOCTEXT("CaddyVehicleDebug", "FeelPanelTitle", "Feel"), 40, ECaddyVehicleDebugPanelType::Feel);
-    AddProvider(TEXT("Vehicle.Camera"), NSLOCTEXT("CaddyVehicleDebug", "CameraPanelTitle", "Camera"), 50, ECaddyVehicleDebugPanelType::Camera);
-    AddProvider(TEXT("Vehicle.Collision"), NSLOCTEXT("CaddyVehicleDebug", "CollisionPanelTitle", "Collision"), 60, ECaddyVehicleDebugPanelType::Collision);
-    AddProvider(TEXT("Vehicle.DebugDraw"), NSLOCTEXT("CaddyVehicleDebug", "DebugDrawPanelTitle", "Debug Draw"), 70, ECaddyVehicleDebugPanelType::DebugDraw);
+    AddProvider(TEXT("Vehicle.Skill"), NSLOCTEXT("CaddyVehicleDebug", "SkillPanelTitle", "Skill"), 50, ECaddyVehicleDebugPanelType::Skill);
+    AddProvider(TEXT("Vehicle.Camera"), NSLOCTEXT("CaddyVehicleDebug", "CameraPanelTitle", "Camera"), 60, ECaddyVehicleDebugPanelType::Camera);
+    AddProvider(TEXT("Vehicle.Collision"), NSLOCTEXT("CaddyVehicleDebug", "CollisionPanelTitle", "Collision"), 70, ECaddyVehicleDebugPanelType::Collision);
+    AddProvider(TEXT("Vehicle.DebugDraw"), NSLOCTEXT("CaddyVehicleDebug", "DebugDrawPanelTitle", "Debug Draw"), 80, ECaddyVehicleDebugPanelType::DebugDraw);
 }
 
 void ACaddyVehiclePawn::UnregisterDebugProviders()

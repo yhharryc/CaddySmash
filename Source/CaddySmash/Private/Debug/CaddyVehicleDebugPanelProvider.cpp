@@ -2,10 +2,13 @@
 
 #include "Curves/CurveFloat.h"
 #include "HitRegister/HitRegisterPipeline.h"
+#include "HitRegisterCollision/HitRegisterTargetingProfile.h"
 #include "Vehicle/ArcadeVehicleMovementComponent.h"
 #include "Vehicle/CaddyVehicleCameraComponent.h"
 #include "Vehicle/CaddyVehicleFeelComponent.h"
 #include "Vehicle/CaddyVehiclePawn.h"
+#include "Vehicle/CaddyVehicleSkillConfigDataAsset.h"
+#include "Vehicle/CaddyVehicleSkillComponent.h"
 #include "Vehicle/CaddyVehicleTuningDataAsset.h"
 
 namespace
@@ -95,6 +98,9 @@ void UCaddyVehicleDebugPanelProvider::GatherDebugRows_Implementation(TArray<FDeb
     case ECaddyVehicleDebugPanelType::Feel:
         GatherFeelRows(OutRows);
         break;
+    case ECaddyVehicleDebugPanelType::Skill:
+        GatherSkillRows(OutRows);
+        break;
     case ECaddyVehicleDebugPanelType::Camera:
         GatherCameraRows(OutRows);
         break;
@@ -174,7 +180,9 @@ void UCaddyVehicleDebugPanelProvider::GatherTuningRows(TArray<FDebugFrameworkPan
     }
 
     const UCaddyVehicleTuningDataAsset* TuningAsset = MovementComponent->GetTuningDataAsset();
+    const UCaddyVehicleSkillConfigDataAsset* SkillConfigAsset = Pawn->GetSkillConfigDataAsset();
     AddRow(OutRows, TEXT("TuningAsset"), TuningAsset ? TuningAsset->GetName() : TEXT("None"));
+    AddRow(OutRows, TEXT("SkillConfigAsset"), SkillConfigAsset ? SkillConfigAsset->GetName() : TEXT("None"));
     AddRow(OutRows, TEXT("PresetCount"), FString::Printf(TEXT("%d"), Pawn->GetRuntimeTuningPresetCount()));
     AddRow(
         OutRows,
@@ -218,6 +226,13 @@ void UCaddyVehicleDebugPanelProvider::GatherTuningRows(TArray<FDebugFrameworkPan
         AddRow(OutRows, TEXT("Feel EngineFreq"), FString::Printf(TEXT("%.2f"), FeelComponent->FeelConfig.EngineScaleVibration.BaseFrequencyHz));
         AddRow(OutRows, TEXT("Feel MaxLean"), FString::Printf(TEXT("%.1f"), FeelComponent->FeelConfig.MaxLateralLeanRollDeg));
         AddRow(OutRows, TEXT("Feel ImpactScale"), FString::Printf(TEXT("%.2f"), FeelComponent->FeelConfig.ImpactPulseScale));
+    }
+    if (const UCaddyVehicleSkillComponent* SkillComponent = Pawn->GetVehicleSkillComponent())
+    {
+        AddRow(OutRows, TEXT("Skill Enabled"), BoolToOnOff(SkillComponent->BrakeDashConfig.bEnableBrakeDashSkill));
+        AddRow(OutRows, TEXT("Skill Cooldown"), FString::Printf(TEXT("%.2f"), SkillComponent->BrakeDashConfig.CooldownSeconds));
+        AddRow(OutRows, TEXT("Skill DashPeakMax"), FString::Printf(TEXT("%.1f"), SkillComponent->BrakeDashConfig.DashPeakSpeedAtMaxCharge));
+        AddRow(OutRows, TEXT("Skill MaxCharge"), FString::Printf(TEXT("%.2f"), SkillComponent->BrakeDashConfig.MaxChargeSeconds));
     }
 }
 
@@ -271,6 +286,92 @@ void UCaddyVehicleDebugPanelProvider::GatherFeelRows(TArray<FDebugFrameworkPanel
     AddRow(OutRows, TEXT("Cfg ImpactDuration"), FString::Printf(TEXT("%.2f"), FeelComponent->FeelConfig.ImpactPulseDuration));
     AddRow(OutRows, TEXT("Cfg ImpactScale"), FString::Printf(TEXT("%.2f"), FeelComponent->FeelConfig.ImpactPulseScale));
     AddRow(OutRows, TEXT("Cfg ImpactKick"), FString::Printf(TEXT("%.1f"), FeelComponent->FeelConfig.ImpactPulseLocationKick));
+}
+
+void UCaddyVehicleDebugPanelProvider::GatherSkillRows(TArray<FDebugFrameworkPanelRow>& OutRows) const
+{
+    const ACaddyVehiclePawn* Pawn = VehiclePawn.Get();
+    const UCaddyVehicleSkillComponent* SkillComponent = Pawn ? Pawn->GetVehicleSkillComponent() : nullptr;
+    if (!Pawn || !SkillComponent)
+    {
+        AddRow(OutRows, TEXT("Status"), TEXT("Vehicle or skill component missing"), FLinearColor::Red);
+        return;
+    }
+
+    const UEnum* SkillStateEnum = StaticEnum<ECaddyVehicleSkillState>();
+    const FString StateLabel = SkillStateEnum
+        ? SkillStateEnum->GetNameStringByValue(static_cast<int64>(SkillComponent->GetSkillState()))
+        : TEXT("Unknown");
+
+    AddRow(OutRows, TEXT("Enabled"), BoolToOnOff(SkillComponent->BrakeDashConfig.bEnableBrakeDashSkill));
+    AddRow(OutRows, TEXT("UseGASStateMachine"), BoolToOnOff(SkillComponent->bUseGASAbilityStateMachine));
+    AddRow(OutRows, TEXT("RigReady"), BoolToOnOff(SkillComponent->IsSkillRigReady()));
+    AddRow(OutRows, TEXT("State"), StateLabel);
+    AddRow(OutRows, TEXT("Active"), BoolToOnOff(SkillComponent->IsSkillActive()));
+    AddRow(OutRows, TEXT("CanTrigger"), BoolToOnOff(SkillComponent->CanTriggerSkillNow()));
+    AddRow(OutRows, TEXT("StateTime"), FString::Printf(TEXT("%.3f"), SkillComponent->GetStateElapsedSeconds()));
+    AddRow(OutRows, TEXT("CooldownRemain"), FString::Printf(TEXT("%.3f"), SkillComponent->GetCooldownRemainingSeconds()));
+    AddRow(OutRows, TEXT("TriggerHold"), FString::Printf(TEXT("%.3f"), SkillComponent->GetTriggerHoldSeconds()));
+    AddRow(OutRows, TEXT("InputPressed"), BoolToOnOff(SkillComponent->IsSkillInputPressed()));
+    AddRow(OutRows, TEXT("OverrideSpeed"), FString::Printf(TEXT("%.1f"), SkillComponent->GetCurrentOverrideSpeed()));
+    AddRow(OutRows, TEXT("ChargeSec"), FString::Printf(TEXT("%.3f"), SkillComponent->GetCurrentChargeSeconds()));
+    AddRow(OutRows, TEXT("ChargeAlpha"), FString::Printf(TEXT("%.2f"), SkillComponent->GetCurrentChargeAlpha()));
+    AddRow(OutRows, TEXT("DashDurActive"), FString::Printf(TEXT("%.3f"), SkillComponent->GetActiveDashDuration()));
+    AddRow(OutRows, TEXT("DashPeakActive"), FString::Printf(TEXT("%.1f"), SkillComponent->GetActiveDashPeakSpeed()));
+
+    const FVector2D AimDirection = SkillComponent->GetCurrentAimDirection();
+    const FVector2D DashDirection = SkillComponent->GetDashDirection();
+    AddRow(OutRows, TEXT("AimDir"), FString::Printf(TEXT("(%.2f, %.2f)"), AimDirection.X, AimDirection.Y));
+    AddRow(OutRows, TEXT("DashDir"), FString::Printf(TEXT("(%.2f, %.2f)"), DashDirection.X, DashDirection.Y));
+    AddRow(OutRows, TEXT("UsingAbilityAim"), BoolToOnOff(SkillComponent->IsUsingAbilityTargetAim()));
+    AddRow(OutRows, TEXT("HasAbilityTarget"), BoolToOnOff(SkillComponent->HasCurrentAbilityTarget()));
+    AddRow(OutRows, TEXT("AbilityTargetActor"), GetNameSafe(SkillComponent->GetCurrentAbilityTargetActor()));
+    const FVector AbilityTargetLocation = SkillComponent->GetCurrentAbilityTargetLocation();
+    AddRow(OutRows, TEXT("AbilityTargetLoc"), FString::Printf(TEXT("(%.1f, %.1f, %.1f)"), AbilityTargetLocation.X, AbilityTargetLocation.Y, AbilityTargetLocation.Z));
+    if (const AActor* TargetActor = SkillComponent->GetCurrentAbilityTargetActor())
+    {
+        AddRow(
+            OutRows,
+            TEXT("AbilityTargetDist"),
+            FString::Printf(TEXT("%.1f"), FVector::Dist2D(Pawn->GetActorLocation(), TargetActor->GetActorLocation())));
+    }
+
+    const UEnum* TriggerModeEnum = StaticEnum<ECaddyVehicleSkillTriggerMode>();
+    AddRow(OutRows, TEXT("Cfg TriggerMode"), TriggerModeEnum
+        ? TriggerModeEnum->GetNameStringByValue(static_cast<int64>(SkillComponent->BrakeDashConfig.TriggerMode))
+        : TEXT("Unknown"));
+    const UEnum* AimSelectionModeEnum = StaticEnum<ECaddyVehicleSkillAimSelectionMode>();
+    AddRow(OutRows, TEXT("Cfg AimMode"), AimSelectionModeEnum
+        ? AimSelectionModeEnum->GetNameStringByValue(static_cast<int64>(SkillComponent->BrakeDashConfig.AbilityTargeting.AimSelectionMode))
+        : TEXT("Unknown"));
+    AddRow(OutRows, TEXT("Cfg AbilityTarget"), BoolToOnOff(SkillComponent->BrakeDashConfig.AbilityTargeting.bEnableAbilityTargeting));
+    AddRow(OutRows, TEXT("Cfg TargetTraceDist"), FString::Printf(TEXT("%.1f"), SkillComponent->BrakeDashConfig.AbilityTargeting.TraceDistance));
+    AddRow(OutRows, TEXT("Cfg TargetTraceRadius"), FString::Printf(TEXT("%.1f"), SkillComponent->BrakeDashConfig.AbilityTargeting.TraceRadius));
+    AddRow(OutRows, TEXT("Cfg TargetTraceChannel"), FString::Printf(TEXT("%d"), static_cast<int32>(SkillComponent->BrakeDashConfig.AbilityTargeting.TraceChannel.GetValue())));
+    const UHitRegisterTargetingProfile* TargetingProfile = SkillComponent->BrakeDashConfig.AbilityTargeting.TargetingProfile.Get();
+    AddRow(OutRows, TEXT("Cfg TargetProfile"), TargetingProfile ? TargetingProfile->GetName() : TEXT("None"));
+    AddRow(OutRows, TEXT("Cfg TargetDebug"), BoolToOnOff(SkillComponent->BrakeDashConfig.AbilityTargeting.bEnableDebugDraw));
+    AddRow(OutRows, TEXT("Cfg TriggerThrottle"), FString::Printf(TEXT("%.2f"), SkillComponent->BrakeDashConfig.TriggerThrottleThreshold));
+    AddRow(OutRows, TEXT("Cfg TriggerBrake"), FString::Printf(TEXT("%.2f"), SkillComponent->BrakeDashConfig.TriggerBrakeThreshold));
+    AddRow(OutRows, TEXT("Cfg TriggerHold"), FString::Printf(TEXT("%.3f"), SkillComponent->BrakeDashConfig.TriggerInputHoldSeconds));
+    AddRow(OutRows, TEXT("Cfg Cooldown"), FString::Printf(TEXT("%.2f"), SkillComponent->BrakeDashConfig.CooldownSeconds));
+    AddRow(OutRows, TEXT("Cfg BrakeDuration"), FString::Printf(TEXT("%.2f"), SkillComponent->BrakeDashConfig.BrakeDuration));
+    AddRow(OutRows, TEXT("Cfg MinCharge"), FString::Printf(TEXT("%.2f"), SkillComponent->BrakeDashConfig.MinChargeSeconds));
+    AddRow(OutRows, TEXT("Cfg MaxCharge"), FString::Printf(TEXT("%.2f"), SkillComponent->BrakeDashConfig.MaxChargeSeconds));
+    AddRow(OutRows, TEXT("Cfg DashDurMin"), FString::Printf(TEXT("%.2f"), SkillComponent->BrakeDashConfig.DashDurationAtMinCharge));
+    AddRow(OutRows, TEXT("Cfg DashDurMax"), FString::Printf(TEXT("%.2f"), SkillComponent->BrakeDashConfig.DashDurationAtMaxCharge));
+    AddRow(OutRows, TEXT("Cfg DashPeakMin"), FString::Printf(TEXT("%.1f"), SkillComponent->BrakeDashConfig.DashPeakSpeedAtMinCharge));
+    AddRow(OutRows, TEXT("Cfg DashPeakMax"), FString::Printf(TEXT("%.1f"), SkillComponent->BrakeDashConfig.DashPeakSpeedAtMaxCharge));
+    AddRow(OutRows, TEXT("Cfg CarryRatio"), FString::Printf(TEXT("%.2f"), SkillComponent->BrakeDashConfig.PostDashCarryRatio));
+    AddRow(OutRows, TEXT("Cfg BrakeCurve"), SkillComponent->BrakeDashConfig.BrakeSpeedAlphaCurve
+        ? SkillComponent->BrakeDashConfig.BrakeSpeedAlphaCurve->GetName()
+        : TEXT("None"));
+    AddRow(OutRows, TEXT("Cfg ChargeCurve"), SkillComponent->BrakeDashConfig.ChargeAlphaCurve
+        ? SkillComponent->BrakeDashConfig.ChargeAlphaCurve->GetName()
+        : TEXT("None"));
+    AddRow(OutRows, TEXT("Cfg DashCurve"), SkillComponent->BrakeDashConfig.DashSpeedAlphaCurve
+        ? SkillComponent->BrakeDashConfig.DashSpeedAlphaCurve->GetName()
+        : TEXT("None"));
 }
 
 void UCaddyVehicleDebugPanelProvider::GatherCameraRows(TArray<FDebugFrameworkPanelRow>& OutRows) const

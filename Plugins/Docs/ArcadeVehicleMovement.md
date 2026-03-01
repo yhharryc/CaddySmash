@@ -18,6 +18,7 @@
   - Draws vehicle debug vectors (forward/target/velocity/lateral) in world.
 - `ACaddyVehiclePawn`
   - Owns collision, mesh, spring arm, top-down camera, movement component, camera manager component.
+  - Owns skill component for modular vehicle abilities (first skill: brake-dash).
   - Converts player 2D input into world-space move intent.
   - Keeps throttle independent from move intent.
   - Exposes `IAbilitySystemInterface` with built-in `UAbilitySystemComponent`.
@@ -35,6 +36,11 @@
   - Applies idle engine shake, acceleration squash/stretch, lateral lean, and collision pulse.
   - Works on mesh relative transform/scale now, designed to be replaced by morph/deformer drivers later.
   - Sources parameters from `UCaddyVehicleTuningDataAsset::FeelConfig`.
+- `UCaddyVehicleSkillComponent`
+  - Modular runtime skill layer for vehicle actions.
+  - Current skill: configurable trigger (input action hold or brake+throttle combo) -> curved emergency brake -> charge/aim -> dash burst with cooldown.
+  - Drives movement via external velocity override while reusing movement collision handling.
+  - Sources parameters from standalone `UCaddyVehicleSkillConfigDataAsset` (decoupled from tuning presets).
 - `ACaddyGameMode`
   - Sets default pawn and player controller.
 - `ACaddyPlayerController`
@@ -45,6 +51,7 @@
 - `Caddy_Accelerate`: gas pedal behavior, no direct steering effect.
 - `Caddy_BrakeReverse`: brakes when moving forward, drives reverse when speed reaches zero.
 - `Caddy_Drift`: hold to reduce lateral grip and increase yaw steering rate.
+- Skill trigger (Phase 1): from `Enhanced Input Action` by default, with optional brake+throttle combo mode.
 
 ## Collision Handling
 - Collision flow:

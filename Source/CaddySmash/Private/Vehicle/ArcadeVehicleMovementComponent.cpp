@@ -114,6 +114,16 @@ void UArcadeVehicleMovementComponent::SetDriftInput(float InDrift)
     bIsDrifting = DriftInput >= HandlingConfig.DriftInputThreshold;
 }
 
+void UArcadeVehicleMovementComponent::SetExternalVelocityControlEnabled(const bool bEnabled)
+{
+    bExternalVelocityControlEnabled = bEnabled;
+}
+
+void UArcadeVehicleMovementComponent::SetExternalPlanarVelocityWorld(const FVector& InWorldVelocity)
+{
+    Velocity = FVector(InWorldVelocity.X, InWorldVelocity.Y, 0.0f);
+}
+
 void UArcadeVehicleMovementComponent::TickComponent(
     float DeltaTime,
     enum ELevelTick TickType,
@@ -133,8 +143,12 @@ void UArcadeVehicleMovementComponent::TickComponent(
         return;
     }
 
-    UpdateVelocity(DeltaTime);
-    UpdateSteering(DeltaTime, Velocity.SizeSquared2D());
+    if (!bExternalVelocityControlEnabled)
+    {
+        UpdateVelocity(DeltaTime);
+        UpdateSteering(DeltaTime, Velocity.SizeSquared2D());
+    }
+
     PerformMovement(DeltaTime);
 }
 

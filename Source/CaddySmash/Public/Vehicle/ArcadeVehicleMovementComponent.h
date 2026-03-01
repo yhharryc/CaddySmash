@@ -281,6 +281,18 @@ public:
     UFUNCTION(BlueprintPure, Category="Vehicle|Collision")
     FString GetLastCollisionActorName() const;
 
+    UFUNCTION(BlueprintCallable, Category="Vehicle|Skill")
+    void SetExternalVelocityControlEnabled(bool bEnabled);
+
+    UFUNCTION(BlueprintPure, Category="Vehicle|Skill")
+    bool IsExternalVelocityControlEnabled() const { return bExternalVelocityControlEnabled; }
+
+    UFUNCTION(BlueprintCallable, Category="Vehicle|Skill")
+    void SetExternalPlanarVelocityWorld(const FVector& InWorldVelocity);
+
+    UFUNCTION(BlueprintPure, Category="Vehicle|Skill")
+    FVector GetPlanarVelocityWorld() const { return FVector(Velocity.X, Velocity.Y, 0.0f); }
+
     virtual float GetMaxSpeed() const override;
     virtual void BeginPlay() override;
     virtual void TickComponent(float DeltaTime, enum ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
@@ -326,4 +338,5 @@ private:
     bool bLastCollisionTriggeredHitRegister = false;
     bool bLastCollisionHitRegisterSucceeded = false;
     FString LastCollisionHitRegisterStatus = TEXT("n/a");
+    bool bExternalVelocityControlEnabled = false;
 };

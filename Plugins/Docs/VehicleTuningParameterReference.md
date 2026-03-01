@@ -135,3 +135,30 @@ Units are Unreal default (`cm`, `cm/s`, `cm/s^2`, `degrees`, `seconds`) unless s
 | `ImpactPulseRotationKickDeg` | Rotational kick magnitude on impact. | More angular hit snap. | Less rotational disturbance. | Add slam energy to collisions. |
 | `OffsetInterpSpeed` | Interp speed for offset/rotation channels. | Faster response, less smoothing. | Smoother, floatier transitions. | Balance responsiveness and jitter. |
 | `ScaleInterpSpeed` | Interp speed for scale channel. | Faster scale snaps. | Softer scale transitions. | Control deformation sharpness. |
+
+## Skill (`UCaddyVehicleSkillConfigDataAsset` -> `FCaddyVehicleBrakeDashSkillConfig`)
+
+Skill config is intentionally separate from `UCaddyVehicleTuningDataAsset` to keep movement tuning and abilities decoupled.
+
+| Parameter | Meaning | Increase | Decrease | Typical Use |
+| --- | --- | --- | --- | --- |
+| `bEnableBrakeDashSkill` | Enables brake-dash skill. | N/A | N/A | Toggle skill usage per vehicle archetype. |
+| `TriggerMode` | Chooses trigger source (`InputActionHold` or `BrakeThrottleCombo`). | N/A | N/A | Swap between dedicated skill key and combo trigger. |
+| `TriggerThrottleThreshold` | Throttle threshold for trigger combo. | Harder to trigger accidentally. | Easier to trigger. | Raise for precision-oriented cars. |
+| `TriggerBrakeThreshold` | Brake threshold for trigger combo. | Harder to trigger accidentally. | Easier to trigger. | Prevent misfires from soft brake taps. |
+| `TriggerInputHoldSeconds` | Required hold time before entering brake phase. | More deliberate activation. | Faster activation. | Prevent accidental spam. |
+| `CooldownSeconds` | Cooldown after dash. | Less frequent skill usage. | More frequent skill usage. | Balance power budget. |
+| `BrakeDuration` | Emergency brake phase duration. | Longer and smoother setup. | Snappier setup. | Tune readability vs responsiveness. |
+| `BrakeSpeedAlphaCurve` | Retained-speed curve during brake phase. | Depends on curve shape. | Depends on curve shape. | Non-linear brake feel. |
+| `MaxChargeSeconds` | Maximum hold time for charging. | Longer potential charge window. | Faster forced release. | Cap setup time and pacing. |
+| `MinChargeSeconds` | Minimum charge required before release can dash. | More commitment before release. | Faster release response. | Avoid instant micro-dash. |
+| `ChargeAlphaCurve` | Charge remap curve from hold-time alpha. | Depends on curve shape. | Depends on curve shape. | Make charge growth front-loaded or back-loaded. |
+| `AimInputDeadZone` | Min input needed to update aim. | More stable aim. | More sensitive aim. | Filter stick noise. |
+| `bRotateOwnerToAimDuringCharge` | Rotate vehicle toward aim while braking/charging. | N/A | N/A | Improve telegraph and player readability. |
+| `AimRotationRateDegPerSec` | Rotation speed while aiming. | Faster visual alignment. | Slower alignment. | Weighty vs snappy style. |
+| `DashDurationAtMinCharge` | Dash duration when released at minimum charge. | Longer baseline lunge. | Shorter baseline burst. | Tune low-commit usage. |
+| `DashDurationAtMaxCharge` | Dash duration at full charge. | Larger distance at full charge. | Smaller distance at full charge. | Control charged skill payoff. |
+| `DashPeakSpeedAtMinCharge` | Dash peak speed at minimum charge. | Stronger low-charge burst. | Softer low-charge burst. | Balance quick taps. |
+| `DashPeakSpeedAtMaxCharge` | Dash peak speed at full charge. | Stronger full-charge burst. | Softer full-charge burst. | Balance high-commit burst strength. |
+| `DashSpeedAlphaCurve` | Dash speed curve over dash duration. | Depends on curve shape. | Depends on curve shape. | Front-loaded or sustained dash character. |
+| `PostDashCarryRatio` | Carry-over speed ratio after dash exits. | More post-dash momentum. | Sharper stop after dash. | Control recoverability and commitment. |

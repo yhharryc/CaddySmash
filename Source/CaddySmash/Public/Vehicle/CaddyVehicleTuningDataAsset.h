@@ -27,7 +27,7 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Vehicle|Camera", meta=(ToolTip="Top-down camera behavior profile (speed effects, lag, look-ahead, roll)."))
     FCaddyVehicleCameraConfig CameraConfig;
 
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Vehicle|Feel", meta=(ToolTip="Visual game-feel profile (idle shake, deform, lean, impact pulse)."))
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Vehicle|Feel", meta=(ToolTip="Visual game-feel profile (engine scale vibration, deform, lean, impact pulse)."))
     FCaddyVehicleFeelConfig FeelConfig;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Vehicle|Config|Collision|HitRegister", meta=(ToolTip="Optional explicit HitRegister pipeline used when publishing collision events for this preset."))
