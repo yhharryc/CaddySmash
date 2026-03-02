@@ -11,5 +11,20 @@ class CADDYSMASH_API ACaddyGameMode : public AGameModeBase
 
 public:
     ACaddyGameMode();
+
+    virtual void BeginPlay() override;
+    virtual AActor* ChoosePlayerStart_Implementation(AController* Player) override;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Caddy|LocalMultiplayer", meta=(ClampMin="1", UIMin="1"))
+    int32 DesiredLocalPlayerCount = 1;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Caddy|LocalMultiplayer")
+    bool bAutoCreateLocalPlayers = true;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Caddy|LocalMultiplayer")
+    bool bUsePlayerStartTagIndex = true;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Caddy|LocalMultiplayer")
+    FName PlayerStartTagPrefix = "Player";
 };
 
