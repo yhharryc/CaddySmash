@@ -7,7 +7,7 @@
 
 namespace
 {
-    static float GetAttrValue(const TMap<FGameplayTag, float>& Attributes, const FGameplayTag& Tag, const float DefaultValue = 0.0f)
+    static float GetCollisionEventsAttrValue(const TMap<FGameplayTag, float>& Attributes, const FGameplayTag& Tag, const float DefaultValue = 0.0f)
     {
         if (!Tag.IsValid())
         {
@@ -85,7 +85,7 @@ EHitNodeResult UHRN_EmitVehicleCollisionGameplayEvents::Execute_Implementation(F
         EmitGameplayEventToTarget(KnockbackGameplayEventTag, Context);
     }
 
-    float ImpactTierValue = GetAttrValue(Context.Attack.Attributes, ImpactTierTag, 0.0f);
+    float ImpactTierValue = GetCollisionEventsAttrValue(Context.Attack.Attributes, ImpactTierTag, 0.0f);
     if (ImpactTierValue <= 0.0f)
     {
         if (HeavyImpactTag.IsValid() && Context.Attack.Tags.HasTagExact(HeavyImpactTag))

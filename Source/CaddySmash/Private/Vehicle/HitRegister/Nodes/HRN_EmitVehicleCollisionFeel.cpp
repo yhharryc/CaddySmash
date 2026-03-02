@@ -6,7 +6,7 @@
 
 namespace
 {
-    static float GetAttrValue(const TMap<FGameplayTag, float>& Attributes, const FGameplayTag& Tag, const float DefaultValue = 0.0f)
+    static float GetCollisionFeelAttrValue(const TMap<FGameplayTag, float>& Attributes, const FGameplayTag& Tag, const float DefaultValue = 0.0f)
     {
         if (!Tag.IsValid())
         {
@@ -65,13 +65,13 @@ EHitNodeResult UHRN_EmitVehicleCollisionFeel::Execute_Implementation(FHitRegiste
     ACaddyVehiclePawn* TargetVehicle = Cast<ACaddyVehiclePawn>(TargetActor);
     ACaddyVehiclePawn* InstigatorVehicle = Cast<ACaddyVehiclePawn>(Context.Attack.Instigator.Get());
 
-    const float NormalImpactSpeed = GetAttrValue(Context.Attack.Attributes, NormalImpactSpeedTag, 0.0f);
+    const float NormalImpactSpeed = GetCollisionFeelAttrValue(Context.Attack.Attributes, NormalImpactSpeedTag, 0.0f);
     if (NormalImpactSpeed < MinNormalImpactSpeed)
     {
         return EHitNodeResult::Continue;
     }
 
-    float ImpactTierValue = GetAttrValue(Context.Attack.Attributes, ImpactTierTag, 0.0f);
+    float ImpactTierValue = GetCollisionFeelAttrValue(Context.Attack.Attributes, ImpactTierTag, 0.0f);
     if (ImpactTierValue <= 0.0f)
     {
         if (HeavyImpactTag.IsValid() && Context.Attack.Tags.HasTagExact(HeavyImpactTag))
