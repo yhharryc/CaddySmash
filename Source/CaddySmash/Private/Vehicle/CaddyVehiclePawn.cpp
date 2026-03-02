@@ -24,6 +24,7 @@
 #include "Vehicle/CaddyVehicleFeelComponent.h"
 #include "Vehicle/Abilities/CaddyVehicleBrakeDashAbility.h"
 #include "Vehicle/Abilities/CaddyVehicleKnockbackAbility.h"
+#include "Vehicle/Abilities/CaddyVehicleStaggerAbility.h"
 #include "Vehicle/Combat/CaddyVehicleAttributeSet.h"
 #include "Vehicle/Combat/CaddyVehicleHitRegisterDamageableComponent.h"
 #include "Vehicle/CaddyVehicleSkillConfigDataAsset.h"
@@ -220,6 +221,7 @@ ACaddyVehiclePawn::ACaddyVehiclePawn()
     VehicleAttributeSet = CreateDefaultSubobject<UCaddyVehicleAttributeSet>(TEXT("VehicleAttributeSet"));
 
     KnockbackAbilityClass = UCaddyVehicleKnockbackAbility::StaticClass();
+    StaggerAbilityClass = UCaddyVehicleStaggerAbility::StaticClass();
 }
 
 void ACaddyVehiclePawn::BeginPlay()
@@ -247,6 +249,7 @@ void ACaddyVehiclePawn::BeginPlay()
 
     GrantOrRefreshSkillAbility();
     GrantOrRefreshKnockbackAbility();
+    GrantOrRefreshStaggerAbility();
     InitializeVehicleAttributes();
 
     if (RuntimeTuningPresets.Num() > 0)
@@ -257,6 +260,10 @@ void ACaddyVehiclePawn::BeginPlay()
             ActiveRuntimeTuningPresetIndex = -1;
         }
     }
+    else if (VehicleMovementComponent)
+    {
+        ApplyVisualConfigsFromTuningAsset(VehicleMovementComponent->GetTuningDataAsset());
+    }
 
     RegisterDebugProviders();
     InitializeEnhancedInputMapping();
@@ -266,6 +273,7 @@ void ACaddyVehiclePawn::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
     ClearGrantedSkillAbility();
     ClearGrantedKnockbackAbility();
+    ClearGrantedStaggerAbility();
 
     if (DefaultInputMappingContext)
     {
@@ -296,6 +304,7 @@ void ACaddyVehiclePawn::PossessedBy(AController* NewController)
 
     GrantOrRefreshSkillAbility();
     GrantOrRefreshKnockbackAbility();
+    GrantOrRefreshStaggerAbility();
     InitializeVehicleAttributes();
     InitializeEnhancedInputMapping();
 }
@@ -501,6 +510,44 @@ void ACaddyVehiclePawn::ClearGrantedKnockbackAbility()
     KnockbackAbilitySpecHandle = FGameplayAbilitySpecHandle();
 }
 
+void ACaddyVehiclePawn::GrantOrRefreshStaggerAbility()
+{
+    if (!HasAuthority() || !AbilitySystemComponent)
+    {
+        return;
+    }
+
+    if (StaggerAbilitySpecHandle.IsValid())
+    {
+        AbilitySystemComponent->ClearAbility(StaggerAbilitySpecHandle);
+        StaggerAbilitySpecHandle = FGameplayAbilitySpecHandle();
+    }
+
+    TSubclassOf<UGameplayAbility> AbilityClass = StaggerAbilityClass;
+    if (!AbilityClass)
+    {
+        AbilityClass = UCaddyVehicleStaggerAbility::StaticClass();
+    }
+    if (!AbilityClass)
+    {
+        return;
+    }
+
+    FGameplayAbilitySpec AbilitySpec(AbilityClass, 1, INDEX_NONE, this);
+    StaggerAbilitySpecHandle = AbilitySystemComponent->GiveAbility(AbilitySpec);
+}
+
+void ACaddyVehiclePawn::ClearGrantedStaggerAbility()
+{
+    if (!HasAuthority() || !AbilitySystemComponent || !StaggerAbilitySpecHandle.IsValid())
+    {
+        return;
+    }
+
+    AbilitySystemComponent->ClearAbility(StaggerAbilitySpecHandle);
+    StaggerAbilitySpecHandle = FGameplayAbilitySpecHandle();
+}
+
 void ACaddyVehiclePawn::InitializeVehicleAttributes()
 {
     if (!HasAuthority() || !AbilitySystemComponent)
@@ -514,6 +561,47 @@ void ACaddyVehiclePawn::InitializeVehicleAttributes()
     AbilitySystemComponent->SetNumericAttributeBase(
         UCaddyVehicleAttributeSet::GetKnockbackResistanceAttribute(),
         FMath::Clamp(DefaultKnockbackResistance, 0.0f, 0.95f));
+}
+
+void ACaddyVehiclePawn::SetInputLocked(const bool bLocked)
+{
+    bInputLocked = bLocked;
+    if (VehicleMovementComponent)
+    {
+        VehicleMovementComponent->SetControlLockEnabled(bLocked);
+    }
+}
+
+void ACaddyVehiclePawn::Multicast_PlayCollisionFeel_Implementation(
+    const float NormalImpactSpeed,
+    const uint8 ImpactTier,
+    const FVector_NetQuantizeNormal ImpactNormal)
+{
+    if (VehicleFeelComponent)
+    {
+        VehicleFeelComponent->TriggerCollisionFeel(
+            NormalImpactSpeed,
+            static_cast<ECaddyVehicleCollisionImpactTier>(ImpactTier),
+            ImpactNormal);
+    }
+}
+
+void ACaddyVehiclePawn::Multicast_BeginStagger_Implementation(const float DurationSeconds, const int32 Spins, const float DirectionSign)
+{
+    SetInputLocked(true);
+    if (VehicleFeelComponent)
+    {
+        VehicleFeelComponent->StartStagger(DurationSeconds, Spins, DirectionSign, nullptr);
+    }
+}
+
+void ACaddyVehiclePawn::Multicast_EndStagger_Implementation()
+{
+    SetInputLocked(false);
+    if (VehicleFeelComponent)
+    {
+        VehicleFeelComponent->StopStagger();
+    }
 }
 
 bool ACaddyVehiclePawn::TryActivateSkillAbility()
@@ -564,6 +652,12 @@ void ACaddyVehiclePawn::SetMoveIntentInput(const FVector2D& InMoveIntentInput)
         return;
     }
 
+    if (bInputLocked)
+    {
+        VehicleMovementComponent->SetMoveIntent(FVector2D::ZeroVector);
+        return;
+    }
+
     const FVector2D WorldIntent = ComputeWorldMoveIntent(InMoveIntentInput);
     VehicleMovementComponent->SetMoveIntent(WorldIntent);
 
@@ -577,6 +671,12 @@ void ACaddyVehiclePawn::SetThrottleInput(float InThrottle)
 {
     if (!VehicleMovementComponent)
     {
+        return;
+    }
+
+    if (bInputLocked)
+    {
+        VehicleMovementComponent->SetThrottleInput(0.0f);
         return;
     }
 
@@ -599,6 +699,12 @@ void ACaddyVehiclePawn::SetDriftInput(float InDrift)
         return;
     }
 
+    if (bInputLocked)
+    {
+        VehicleMovementComponent->SetDriftInput(0.0f);
+        return;
+    }
+
     VehicleMovementComponent->SetDriftInput(InDrift);
     if (!HasAuthority())
     {
@@ -610,6 +716,12 @@ void ACaddyVehiclePawn::SetBrakeReverseInput(float InBrakeReverse)
 {
     if (!VehicleMovementComponent)
     {
+        return;
+    }
+
+    if (bInputLocked)
+    {
+        VehicleMovementComponent->SetBrakeReverseInput(0.0f);
         return;
     }
 
@@ -639,14 +751,7 @@ bool ACaddyVehiclePawn::ApplyRuntimeTuningPresetByIndex(int32 InIndex)
     }
 
     VehicleMovementComponent->SetTuningDataAsset(TargetPreset, true);
-    if (VehicleCameraComponent)
-    {
-        VehicleCameraComponent->SetCameraConfig(TargetPreset->CameraConfig, false);
-    }
-    if (VehicleFeelComponent)
-    {
-        VehicleFeelComponent->SetFeelConfig(TargetPreset->FeelConfig, false);
-    }
+    ApplyVisualConfigsFromTuningAsset(TargetPreset);
     ActiveRuntimeTuningPresetIndex = InIndex;
 
     if (!HasAuthority())
@@ -655,6 +760,23 @@ bool ACaddyVehiclePawn::ApplyRuntimeTuningPresetByIndex(int32 InIndex)
     }
 
     return true;
+}
+
+void ACaddyVehiclePawn::ApplyVisualConfigsFromTuningAsset(const UCaddyVehicleTuningDataAsset* TuningAsset)
+{
+    if (!TuningAsset)
+    {
+        return;
+    }
+
+    if (VehicleCameraComponent)
+    {
+        VehicleCameraComponent->SetCameraConfig(TuningAsset->CameraConfig, false);
+    }
+    if (VehicleFeelComponent)
+    {
+        VehicleFeelComponent->SetFeelConfig(TuningAsset->FeelConfig, false);
+    }
 }
 
 bool ACaddyVehiclePawn::CycleRuntimeTuningPreset(int32 Step)
@@ -804,6 +926,11 @@ void ACaddyVehiclePawn::InputSkillStartedAction(const FInputActionValue& Value)
     (void)Value;
     if (VehicleSkillComponent)
     {
+        if (bInputLocked)
+        {
+            return;
+        }
+
         VehicleSkillComponent->SetSkillInputPressed(true);
         TryActivateSkillAbility();
         if (!HasAuthority())
@@ -818,6 +945,11 @@ void ACaddyVehiclePawn::InputSkillCompletedAction(const FInputActionValue& Value
     (void)Value;
     if (VehicleSkillComponent)
     {
+        if (bInputLocked)
+        {
+            return;
+        }
+
         VehicleSkillComponent->SetSkillInputPressed(false);
         if (!HasAuthority())
         {

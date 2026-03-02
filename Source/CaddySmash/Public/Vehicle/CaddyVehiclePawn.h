@@ -24,6 +24,7 @@ class UInputMappingContext;
 class USpringArmComponent;
 class UStaticMeshComponent;
 struct FInputActionValue;
+enum class ECaddyVehicleCollisionImpactTier : uint8;
 
 UCLASS()
 class CADDYSMASH_API ACaddyVehiclePawn : public APawn, public IAbilitySystemInterface
@@ -95,6 +96,18 @@ public:
     UFUNCTION(BlueprintPure, Category="Vehicle|Attributes")
     float GetVehicleKnockbackResistance() const;
 
+    UFUNCTION(BlueprintPure, Category="Vehicle|State")
+    bool IsInputLocked() const { return bInputLocked; }
+
+    UFUNCTION(NetMulticast, Unreliable)
+    void Multicast_PlayCollisionFeel(float NormalImpactSpeed, uint8 ImpactTier, FVector_NetQuantizeNormal ImpactNormal);
+
+    UFUNCTION(NetMulticast, Unreliable)
+    void Multicast_BeginStagger(float DurationSeconds, int32 Spins, float DirectionSign);
+
+    UFUNCTION(NetMulticast, Unreliable)
+    void Multicast_EndStagger();
+
 protected:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Vehicle|Components")
     TObjectPtr<UCapsuleComponent> CollisionComponent;
@@ -150,6 +163,9 @@ protected:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Vehicle|Ability")
     TSubclassOf<UGameplayAbility> KnockbackAbilityClass;
 
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Vehicle|Ability")
+    TSubclassOf<UGameplayAbility> StaggerAbilityClass;
+
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Vehicle|Input|Enhanced")
     TObjectPtr<UInputMappingContext> DefaultInputMappingContext = nullptr;
 
@@ -176,9 +192,12 @@ private:
     void ClearGrantedSkillAbility();
     void GrantOrRefreshKnockbackAbility();
     void ClearGrantedKnockbackAbility();
+    void GrantOrRefreshStaggerAbility();
+    void ClearGrantedStaggerAbility();
     void InitializeVehicleAttributes();
     bool TryActivateSkillAbility();
     bool IsSkillComboTriggerHeld() const;
+    void SetInputLocked(bool bLocked);
 
     UFUNCTION(Server, Unreliable)
     void ServerSetMoveIntent(FVector2D InMoveIntent);
@@ -211,6 +230,7 @@ private:
     void InputSkillCompletedAction(const FInputActionValue& Value);
     void InitializeEnhancedInputMapping();
     FVector2D ComputeWorldMoveIntent(const FVector2D& InRawMoveInput) const;
+    void ApplyVisualConfigsFromTuningAsset(const UCaddyVehicleTuningDataAsset* TuningAsset);
     void RegisterDebugProviders();
     void UnregisterDebugProviders();
 
@@ -218,6 +238,9 @@ private:
 
     FGameplayAbilitySpecHandle SkillAbilitySpecHandle;
     FGameplayAbilitySpecHandle KnockbackAbilitySpecHandle;
+    FGameplayAbilitySpecHandle StaggerAbilitySpecHandle;
+
+    bool bInputLocked = false;
 
     UPROPERTY(Transient)
     TArray<TObjectPtr<UCaddyVehicleDebugPanelProvider>> DebugPanelProviders;

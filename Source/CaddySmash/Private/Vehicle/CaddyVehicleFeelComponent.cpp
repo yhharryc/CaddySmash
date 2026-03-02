@@ -1,14 +1,18 @@
 #include "Vehicle/CaddyVehicleFeelComponent.h"
 
+#include "Camera/CameraShakeBase.h"
 #include "Components/SceneComponent.h"
 #include "Curves/CurveFloat.h"
 #include "GameFramework/Pawn.h"
+#include "GameFramework/PlayerController.h"
 #include "Vehicle/ArcadeVehicleMovementComponent.h"
+#include "Vehicle/Effects/CaddyVehicleCollisionCameraShake.h"
 
 UCaddyVehicleFeelComponent::UCaddyVehicleFeelComponent()
 {
     PrimaryComponentTick.bCanEverTick = true;
     PrimaryComponentTick.bStartWithTickEnabled = true;
+    FeelConfig.CollisionFeel.CameraShakeClass = UCaddyVehicleCollisionCameraShake::StaticClass();
 }
 
 void UCaddyVehicleFeelComponent::SetFeelConfig(const FCaddyVehicleFeelConfig& InConfig, bool bSnapToConfig)
@@ -201,7 +205,11 @@ void UCaddyVehicleFeelComponent::TickComponent(
     }
     CurrentLeanRollDeg = FMath::FInterpTo(CurrentLeanRollDeg, LeanTarget, DeltaTime, FeelConfig.OffsetInterpSpeed);
 
-    TryTriggerImpactPulse(DeltaTime);
+    if (FeelConfig.bUseMovementCollisionImpactPulseFallback)
+    {
+        TryTriggerImpactPulse(DeltaTime);
+    }
+    UpdateHitStop(DeltaTime);
     float ImpactPulseAlpha = 0.0f;
     if (FeelConfig.bEnableImpactPulse && ImpactPulseStartTime >= 0.0f && GetWorld())
     {
@@ -219,13 +227,59 @@ void UCaddyVehicleFeelComponent::TickComponent(
             ImpactPulseAlpha = ImpactPulseStrength * Envelope;
         }
     }
-    CurrentImpactStrength = FMath::FInterpTo(CurrentImpactStrength, ImpactPulseAlpha, DeltaTime, FeelConfig.OffsetInterpSpeed);
+    // Keep collision pulse snappy so left/right response is visible on the first frames.
+    CurrentImpactStrength = FMath::Clamp(ImpactPulseAlpha, 0.0f, 1.0f);
 
-    const FVector ImpactLocationOffset = -ImpactPulseNormal.GetSafeNormal2D() * (FeelConfig.ImpactPulseLocationKick * CurrentImpactStrength);
+    const FVector ImpactWorldNormal = ImpactPulseNormal.GetSafeNormal2D();
+    const FVector ImpactLocationOffset = -ImpactWorldNormal * (FeelConfig.ImpactPulseLocationKick * CurrentImpactStrength);
+
+    FVector ImpactLocalNormal = ImpactWorldNormal;
+    if (Visual)
+    {
+        const FVector VisualForward = Visual->GetForwardVector().GetSafeNormal2D();
+        const FVector VisualRight = Visual->GetRightVector().GetSafeNormal2D();
+        ImpactLocalNormal = FVector(
+            FVector::DotProduct(ImpactWorldNormal, VisualForward),
+            FVector::DotProduct(ImpactWorldNormal, VisualRight),
+            0.0f).GetSafeNormal2D();
+    }
+    CurrentImpactWorldNormal = ImpactWorldNormal;
+    CurrentImpactLocalNormal = ImpactLocalNormal;
+
+    float MovementSide = 0.0f;
+    if (FeelConfig.bPreferMovementHitSideForRoll && Movement)
+    {
+        const float Age = Movement->GetTimeSinceLastBlockingHit();
+        const AActor* OtherActor = Movement->GetLastCollisionActor();
+        const AActor* OwnerActor = GetOwner();
+        if (Age >= 0.0f && Age <= 0.20f && OtherActor && Visual && OwnerActor)
+        {
+            const FVector ToOther = (OtherActor->GetActorLocation() - OwnerActor->GetActorLocation()).GetSafeNormal2D();
+            if (!ToOther.IsNearlyZero())
+            {
+                MovementSide = FVector::DotProduct(ToOther, Visual->GetRightVector().GetSafeNormal2D());
+            }
+        }
+    }
+    CurrentImpactRollSideFromMovement = MovementSide;
+
+    float ImpactRollInput = ImpactLocalNormal.Y;
+    if (!FMath::IsNearlyZero(MovementSide, KINDA_SMALL_NUMBER))
+    {
+        ImpactRollInput = MovementSide;
+    }
+    if (FeelConfig.bImpactRollUseSideSignOnly && !FMath::IsNearlyZero(ImpactRollInput, KINDA_SMALL_NUMBER))
+    {
+        ImpactRollInput = FMath::Sign(ImpactRollInput);
+    }
+    CurrentImpactRollInput = ImpactRollInput;
+
     const FRotator ImpactRotationOffset(
-        ImpactPulseNormal.X * FeelConfig.ImpactPulseRotationKickDeg * CurrentImpactStrength,
+        ImpactLocalNormal.X * FeelConfig.ImpactPulsePitchDirection * FeelConfig.ImpactPulseRotationKickDeg * CurrentImpactStrength,
         0.0f,
-        ImpactPulseNormal.Y * FeelConfig.ImpactPulseRotationKickDeg * CurrentImpactStrength);
+        ImpactRollInput * FeelConfig.ImpactPulseRollDirection * FeelConfig.ImpactPulseRotationKickDeg * CurrentImpactStrength);
+    CurrentImpactPitchDeg = ImpactRotationOffset.Pitch;
+    CurrentImpactRollDeg = ImpactRotationOffset.Roll;
 
     FVector ScaleTarget = FVector::OneVector;
     if (FeelConfig.bEnableAccelerationDeform)
@@ -267,13 +321,58 @@ void UCaddyVehicleFeelComponent::TickComponent(
         DeltaTime,
         FeelConfig.OffsetInterpSpeed);
 
+    const float LeanAtImpact = FMath::Clamp(FeelConfig.LeanMultiplierAtMaxImpact, 0.0f, 1.0f);
+    const bool bImpactActive = CurrentImpactStrength > KINDA_SMALL_NUMBER || ImpactPulseStartTime >= 0.0f;
+    const float LeanMultiplier = (FeelConfig.bOverrideLeanWhileImpactActive && bImpactActive)
+        ? LeanAtImpact
+        : FMath::Lerp(1.0f, LeanAtImpact, CurrentImpactStrength);
+    CurrentComposedLeanRollDeg = CurrentLeanRollDeg * LeanMultiplier;
+
     FRotator RotationTarget = ImpactRotationOffset;
-    RotationTarget.Roll += CurrentLeanRollDeg;
+    RotationTarget.Roll += CurrentComposedLeanRollDeg;
+    RotationTarget.Roll += CurrentImpactRollImpulseDeg;
     CurrentRotationOffset = FMath::RInterpTo(
         CurrentRotationOffset,
         RotationTarget,
         DeltaTime,
         FeelConfig.OffsetInterpSpeed);
+
+    CurrentImpactRollImpulseDeg = FMath::FInterpTo(
+        CurrentImpactRollImpulseDeg,
+        0.0f,
+        DeltaTime,
+        FMath::Max(0.0f, FeelConfig.ImpactRollImpulseDecaySpeed));
+
+    if (bStaggerActive && GetWorld())
+    {
+        const float Elapsed = GetWorld()->GetTimeSeconds() - StaggerStartTime;
+        const float Duration = FMath::Max(0.01f, StaggerDuration);
+        const float T = FMath::Clamp(Elapsed / Duration, 0.0f, 1.0f);
+        if (T >= 1.0f)
+        {
+            bStaggerActive = false;
+            CurrentStaggerYaw = 0.0f;
+        }
+        else
+        {
+            float Alpha = T;
+            if (StaggerCurve.IsValid())
+            {
+                Alpha = StaggerCurve->GetFloatValue(T);
+            }
+            else
+            {
+                Alpha = FMath::InterpEaseInOut(0.0f, 1.0f, T, 2.0f);
+            }
+
+            const float TotalYaw = 360.0f * FMath::Max(0, StaggerSpins);
+            CurrentStaggerYaw = StaggerDirection * TotalYaw * Alpha;
+        }
+    }
+
+    RotationTarget = CurrentRotationOffset;
+    RotationTarget.Yaw += CurrentStaggerYaw;
+    CurrentRotationOffset = RotationTarget;
 
     Visual->SetRelativeLocation(BaseRelativeLocation + CurrentLocationOffset);
     Visual->SetRelativeRotation(BaseRelativeRotation + CurrentRotationOffset);
@@ -389,12 +488,29 @@ void UCaddyVehicleFeelComponent::SnapToBaseTransform()
     CurrentForwardAccelAlpha = 0.0f;
     CurrentSpeedStretchAlpha = 0.0f;
     CurrentLeanRollDeg = 0.0f;
+    CurrentComposedLeanRollDeg = 0.0f;
+    CurrentImpactPitchDeg = 0.0f;
+    CurrentImpactRollDeg = 0.0f;
+    CurrentImpactRollInput = 0.0f;
+    CurrentImpactRollSideFromMovement = 0.0f;
+    CurrentImpactRollImpulseDeg = 0.0f;
     CurrentImpactStrength = 0.0f;
     CurrentLocationOffset = FVector::ZeroVector;
     CurrentRotationOffset = FRotator::ZeroRotator;
     CurrentScaleMultiplier = FVector::OneVector;
+    CurrentImpactWorldNormal = FVector::ZeroVector;
+    CurrentImpactLocalNormal = FVector::ZeroVector;
     ImpactPulseStrength = 0.0f;
     ImpactPulseStartTime = -1.0f;
+    HitStopEndTime = -1.0f;
+    HitStopTimeDilation = 1.0f;
+    bStaggerActive = false;
+    StaggerStartTime = -1.0f;
+    StaggerDuration = 0.0f;
+    StaggerSpins = 0;
+    StaggerDirection = 1.0f;
+    CurrentStaggerYaw = 0.0f;
+    StaggerCurve.Reset();
     LastObservedCollisionAge = -1.0f;
     bHasPreviousForwardSpeed = false;
     PreviousForwardSpeed = 0.0f;
@@ -412,6 +528,14 @@ void UCaddyVehicleFeelComponent::TryTriggerImpactPulse(float DeltaTime)
     if (!FeelConfig.bEnableImpactPulse || !MovementComponent.IsValid())
     {
         LastObservedCollisionAge = -1.0f;
+        return;
+    }
+
+    // Explicit collision-feel events from HitRegister should take priority.
+    // Fallback exists only for cases where pipeline-driven feel is missing.
+    const float LastFeelAge = GetLastCollisionFeelEventAgeSeconds();
+    if (LastFeelAge >= 0.0f && LastFeelAge <= 0.20f)
+    {
         return;
     }
 
@@ -446,4 +570,203 @@ void UCaddyVehicleFeelComponent::TryTriggerImpactPulse(float DeltaTime)
     ImpactPulseStrength = FMath::Max(ImpactPulseStrength, Strength);
     ImpactPulseStartTime = GetWorld()->GetTimeSeconds();
     ImpactPulseNormal = Movement->GetLastCollisionNormal().GetSafeNormal2D();
+}
+
+void UCaddyVehicleFeelComponent::UpdateHitStop(float DeltaTime)
+{
+    (void)DeltaTime;
+    if (HitStopEndTime < 0.0f || !GetWorld())
+    {
+        return;
+    }
+
+    if (GetWorld()->GetTimeSeconds() >= HitStopEndTime)
+    {
+        HitStopEndTime = -1.0f;
+        HitStopTimeDilation = 1.0f;
+
+        if (APawn* OwnerPawn = Cast<APawn>(GetOwner()))
+        {
+            OwnerPawn->CustomTimeDilation = 1.0f;
+        }
+    }
+}
+
+void UCaddyVehicleFeelComponent::TriggerCollisionFeel(
+    const float NormalImpactSpeed,
+    const ECaddyVehicleCollisionImpactTier ImpactTier,
+    const FVector& ImpactNormal)
+{
+    UWorld* World = GetWorld();
+    if (!World)
+    {
+        return;
+    }
+
+    FVector ResolvedImpactNormal = ImpactNormal.GetSafeNormal2D();
+    if (ResolvedImpactNormal.IsNearlyZero())
+    {
+        if (const APawn* OwnerPawn = Cast<APawn>(GetOwner()))
+        {
+            ResolvedImpactNormal = -OwnerPawn->GetActorForwardVector().GetSafeNormal2D();
+        }
+    }
+    if (ResolvedImpactNormal.IsNearlyZero())
+    {
+        ResolvedImpactNormal = FVector::ForwardVector;
+    }
+
+    CollisionFeelEventCount++;
+    LastCollisionFeelEventTime = World->GetTimeSeconds();
+    LastCollisionFeelEventNormalWorld = ResolvedImpactNormal;
+
+    if (!FeelConfig.CollisionFeel.bEnableCollisionFeel)
+    {
+        return;
+    }
+
+    const float MaxSpeed = FMath::Max(1.0f, FeelConfig.CollisionFeel.ImpactNormalSpeedForMaxStrength);
+    float Strength = FMath::Clamp(NormalImpactSpeed / MaxSpeed, 0.0f, 1.0f);
+
+    if (ImpactTier == ECaddyVehicleCollisionImpactTier::Heavy)
+    {
+        Strength = FMath::Max(Strength, 0.9f);
+    }
+    else if (ImpactTier == ECaddyVehicleCollisionImpactTier::Medium)
+    {
+        Strength = FMath::Max(Strength, 0.6f);
+    }
+    else if (ImpactTier == ECaddyVehicleCollisionImpactTier::Light)
+    {
+        Strength = FMath::Max(Strength, 0.35f);
+    }
+
+    if (Strength < FeelConfig.CollisionFeel.MinImpactStrength)
+    {
+        return;
+    }
+
+    if (const APawn* OwnerPawn = Cast<APawn>(GetOwner()))
+    {
+        float RollInput = FVector::DotProduct(ResolvedImpactNormal, OwnerPawn->GetActorRightVector().GetSafeNormal2D());
+        if (FeelConfig.bImpactRollUseSideSignOnly && !FMath::IsNearlyZero(RollInput, KINDA_SMALL_NUMBER))
+        {
+            RollInput = FMath::Sign(RollInput);
+        }
+        if (!FMath::IsNearlyZero(RollInput, KINDA_SMALL_NUMBER))
+        {
+            const float EventImpulse = RollInput
+                * FeelConfig.ImpactPulseRollDirection
+                * FMath::Max(0.0f, FeelConfig.ImpactRollImpulseOnEventDeg)
+                * Strength;
+            CurrentImpactRollImpulseDeg += EventImpulse;
+            const float MaxImpulseAbs = FMath::Max(0.0f, FeelConfig.ImpactRollImpulseOnEventDeg) * 2.0f;
+            if (MaxImpulseAbs > KINDA_SMALL_NUMBER)
+            {
+                CurrentImpactRollImpulseDeg = FMath::Clamp(CurrentImpactRollImpulseDeg, -MaxImpulseAbs, MaxImpulseAbs);
+            }
+        }
+    }
+
+    if (FeelConfig.bEnableImpactPulse)
+    {
+        ImpactPulseNormal = ResolvedImpactNormal;
+        ImpactPulseStrength = FMath::Max(ImpactPulseStrength, Strength);
+        ImpactPulseStartTime = World->GetTimeSeconds();
+    }
+
+    const float HitStopDuration = FeelConfig.CollisionFeel.HitStopDuration * Strength;
+    if (HitStopDuration > KINDA_SMALL_NUMBER)
+    {
+        HitStopEndTime = World->GetTimeSeconds() + HitStopDuration;
+        HitStopTimeDilation = FMath::Lerp(1.0f, FeelConfig.CollisionFeel.HitStopTimeDilation, Strength);
+
+        if (APawn* OwnerPawn = Cast<APawn>(GetOwner()))
+        {
+            OwnerPawn->CustomTimeDilation = HitStopTimeDilation;
+        }
+    }
+
+    if (APawn* OwnerPawn = Cast<APawn>(GetOwner()))
+    {
+        if (OwnerPawn->IsLocallyControlled() && FeelConfig.CollisionFeel.CameraShakeClass)
+        {
+            if (APlayerController* PlayerController = OwnerPawn->GetController<APlayerController>())
+            {
+                if (PlayerController->PlayerCameraManager)
+                {
+                    const float ShakeScale = FeelConfig.CollisionFeel.CameraShakeScale * Strength;
+                    PlayerController->PlayerCameraManager->StartCameraShake(FeelConfig.CollisionFeel.CameraShakeClass, ShakeScale);
+                }
+            }
+        }
+    }
+}
+
+float UCaddyVehicleFeelComponent::GetLastCollisionFeelEventAgeSeconds() const
+{
+    if (!GetWorld() || LastCollisionFeelEventTime < 0.0f)
+    {
+        return -1.0f;
+    }
+    return GetWorld()->GetTimeSeconds() - LastCollisionFeelEventTime;
+}
+
+void UCaddyVehicleFeelComponent::StartStagger(
+    const float DurationSeconds,
+    const int32 Spins,
+    const float DirectionSign,
+    UCurveFloat* OptionalCurve)
+{
+    if (DurationSeconds <= KINDA_SMALL_NUMBER || Spins <= 0)
+    {
+        return;
+    }
+
+    bStaggerActive = true;
+    StaggerStartTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f;
+    StaggerDuration = DurationSeconds;
+    StaggerSpins = Spins;
+    StaggerDirection = (DirectionSign >= 0.0f) ? 1.0f : -1.0f;
+    if (OptionalCurve)
+    {
+        StaggerCurve = OptionalCurve;
+    }
+    else
+    {
+        StaggerCurve = FeelConfig.StaggerFeel.StaggerYawAlphaCurve;
+    }
+    CurrentStaggerYaw = 0.0f;
+}
+
+void UCaddyVehicleFeelComponent::StopStagger()
+{
+    bStaggerActive = false;
+    StaggerStartTime = -1.0f;
+    StaggerDuration = 0.0f;
+    StaggerSpins = 0;
+    StaggerDirection = 1.0f;
+    StaggerCurve.Reset();
+    CurrentStaggerYaw = 0.0f;
+}
+
+float UCaddyVehicleFeelComponent::GetStaggerTimeRemaining() const
+{
+    if (!bStaggerActive || !GetWorld())
+    {
+        return 0.0f;
+    }
+
+    const float Elapsed = GetWorld()->GetTimeSeconds() - StaggerStartTime;
+    return FMath::Max(0.0f, StaggerDuration - Elapsed);
+}
+
+float UCaddyVehicleFeelComponent::GetHitStopTimeRemaining() const
+{
+    if (HitStopEndTime < 0.0f || !GetWorld())
+    {
+        return 0.0f;
+    }
+
+    return FMath::Max(0.0f, HitStopEndTime - GetWorld()->GetTimeSeconds());
 }

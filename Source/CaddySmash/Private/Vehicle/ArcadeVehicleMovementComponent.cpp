@@ -127,6 +127,13 @@ FString UArcadeVehicleMovementComponent::GetLastCollisionActorName() const
 
 void UArcadeVehicleMovementComponent::SetMoveIntent(const FVector2D& InWorldDirection)
 {
+    if (bControlLockEnabled)
+    {
+        bHasMoveIntent = false;
+        MoveIntentWorldDir = FVector2D::ZeroVector;
+        return;
+    }
+
     const float InputSize = InWorldDirection.Size();
     if (InputSize < HandlingConfig.MoveIntentDeadZone)
     {
@@ -141,16 +148,35 @@ void UArcadeVehicleMovementComponent::SetMoveIntent(const FVector2D& InWorldDire
 
 void UArcadeVehicleMovementComponent::SetThrottleInput(float InThrottle)
 {
+    if (bControlLockEnabled)
+    {
+        ThrottleInput = 0.0f;
+        return;
+    }
+
     ThrottleInput = FMath::Clamp(InThrottle, 0.0f, 1.0f);
 }
 
 void UArcadeVehicleMovementComponent::SetBrakeReverseInput(float InBrakeReverse)
 {
+    if (bControlLockEnabled)
+    {
+        BrakeReverseInput = 0.0f;
+        return;
+    }
+
     BrakeReverseInput = FMath::Clamp(InBrakeReverse, 0.0f, 1.0f);
 }
 
 void UArcadeVehicleMovementComponent::SetDriftInput(float InDrift)
 {
+    if (bControlLockEnabled)
+    {
+        DriftInput = 0.0f;
+        bIsDrifting = false;
+        return;
+    }
+
     DriftInput = FMath::Clamp(InDrift, 0.0f, 1.0f);
     bIsDrifting = DriftInput >= HandlingConfig.DriftInputThreshold;
 }
@@ -158,6 +184,20 @@ void UArcadeVehicleMovementComponent::SetDriftInput(float InDrift)
 void UArcadeVehicleMovementComponent::SetExternalVelocityControlEnabled(const bool bEnabled)
 {
     bExternalVelocityControlEnabled = bEnabled;
+}
+
+void UArcadeVehicleMovementComponent::SetControlLockEnabled(const bool bEnabled)
+{
+    bControlLockEnabled = bEnabled;
+    if (bControlLockEnabled)
+    {
+        ThrottleInput = 0.0f;
+        BrakeReverseInput = 0.0f;
+        DriftInput = 0.0f;
+        bIsDrifting = false;
+        bHasMoveIntent = false;
+        MoveIntentWorldDir = FVector2D::ZeroVector;
+    }
 }
 
 void UArcadeVehicleMovementComponent::SetExternalPlanarVelocityWorld(const FVector& InWorldVelocity)
@@ -447,11 +487,14 @@ void UArcadeVehicleMovementComponent::TryEmitCollisionHitRegisterEvent(
 {
     bLastCollisionTriggeredHitRegister = false;
     bLastCollisionHitRegisterSucceeded = false;
+    bLastCollisionUsedDefaultPipeline = false;
     LastCollisionHitRegisterStatus = TEXT("Filtered");
     LastCollisionRelativeNormalSpeed = 0.0f;
     LastCollisionEffectiveNormalSpeed = 0.0f;
     LastCollisionImpactScore = 0.0f;
     LastCollisionImpactTier = ECaddyVehicleCollisionImpactTier::None;
+    LastCollisionFeelRecipientCount = 0;
+    bLastCollisionFeelNodeExecuted = false;
     bLastCollisionTargetWasVehicle = false;
     bLastCollisionAttackerWasDashing = false;
 
@@ -566,6 +609,8 @@ void UArcadeVehicleMovementComponent::TryEmitCollisionHitRegisterEvent(
     const FGameplayTag ImpactScoreOutputAttributeTag = ResolveCollisionAttributeTag(HitRegisterConfig.ImpactScoreAttributeTag, TEXT("Attr.Collision.ImpactScore"));
     const FGameplayTag ImpactTierOutputAttributeTag = ResolveCollisionAttributeTag(HitRegisterConfig.ImpactTierAttributeTag, TEXT("Attr.Collision.ImpactTier"));
     const FGameplayTag EffectiveNormalOutputAttributeTag = ResolveCollisionAttributeTag(HitRegisterConfig.EffectiveNormalSpeedAttributeTag, TEXT("Attr.Collision.EffectiveNormalImpactSpeed"));
+    const FGameplayTag FeelRecipientCountOutputAttributeTag = FGameplayTag::RequestGameplayTag(FName("Attr.Collision.Debug.FeelRecipientCount"), false);
+    const FGameplayTag FeelExecutedOutputAttributeTag = FGameplayTag::RequestGameplayTag(FName("Attr.Collision.Debug.FeelExecuted"), false);
 
     AddAttributeIfValid(AttackRequest.Attributes, TotalSpeedAttributeTag, TotalSpeed);
     AddAttributeIfValid(AttackRequest.Attributes, NormalSpeedAttributeTag, NormalImpactSpeed);
@@ -581,9 +626,15 @@ void UArcadeVehicleMovementComponent::TryEmitCollisionHitRegisterEvent(
     {
         bHitRegisterResult = UHitRegisterBPLibrary::ExecuteHitRegister(this, AttackRequest, Hit, CollisionHitRegisterPipeline, Context);
     }
+    else if (HitRegisterConfig.bAllowDefaultPipelineFallback)
+    {
+        bLastCollisionUsedDefaultPipeline = true;
+        bHitRegisterResult = UHitRegisterBPLibrary::ExecuteHitRegisterDefault(this, AttackRequest, Hit, Context);
+    }
     else
     {
-        bHitRegisterResult = UHitRegisterBPLibrary::ExecuteHitRegisterDefault(this, AttackRequest, Hit, Context);
+        LastCollisionHitRegisterStatus = TEXT("NoPipeline");
+        return;
     }
 
     bLastCollisionTriggeredHitRegister = true;
@@ -592,10 +643,14 @@ void UArcadeVehicleMovementComponent::TryEmitCollisionHitRegisterEvent(
     LastCollisionEffectiveNormalSpeed = GetAttributeOrDefault(Context.Attack.Attributes, EffectiveNormalOutputAttributeTag, 0.0f);
     LastCollisionImpactScore = GetAttributeOrDefault(Context.Attack.Attributes, ImpactScoreOutputAttributeTag, 0.0f);
     LastCollisionImpactTier = ToImpactTier(GetAttributeOrDefault(Context.Attack.Attributes, ImpactTierOutputAttributeTag, 0.0f));
+    LastCollisionFeelRecipientCount = FMath::Max(0, FMath::RoundToInt(GetAttributeOrDefault(Context.Attack.Attributes, FeelRecipientCountOutputAttributeTag, 0.0f)));
+    bLastCollisionFeelNodeExecuted = GetAttributeOrDefault(Context.Attack.Attributes, FeelExecutedOutputAttributeTag, 0.0f) > 0.5f;
 
     if (bHitRegisterResult)
     {
-        LastCollisionHitRegisterStatus = TEXT("Success");
+        LastCollisionHitRegisterStatus = bLastCollisionUsedDefaultPipeline
+            ? TEXT("Success(DefaultPipeline)")
+            : TEXT("Success(ExplicitPipeline)");
     }
     else
     {
@@ -606,6 +661,7 @@ void UArcadeVehicleMovementComponent::TryEmitCollisionHitRegisterEvent(
         LastCollisionHitRegisterStatus = FString::Printf(TEXT("Stopped:%s"), *StopReason);
     }
 }
+
 
 void UArcadeVehicleMovementComponent::CacheCollisionTelemetry(
     const FHitResult& Hit,

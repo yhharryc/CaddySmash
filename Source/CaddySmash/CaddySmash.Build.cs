@@ -15,6 +15,8 @@ public class CaddySmash : ModuleRules
 			"Engine",
 			"InputCore",
 			"EnhancedInput",
+			"EngineCameras",
+			"GameplayCameras",
 			"GameplayAbilities",
 			"GameplayTags",
 			"GameplayTasks"

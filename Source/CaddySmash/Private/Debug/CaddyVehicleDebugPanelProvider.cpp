@@ -155,6 +155,7 @@ void UCaddyVehicleDebugPanelProvider::GatherCoreRows(TArray<FDebugFrameworkPanel
         ? FString::Printf(TEXT("%.1f"), MovementComponent->GetTargetYawFromMoveIntent())
         : TEXT("n/a"));
     AddRow(OutRows, TEXT("Drifting"), BoolToOnOff(MovementComponent->IsDrifting()), MovementComponent->IsDrifting() ? FLinearColor(1.0f, 0.4f, 0.9f, 1.0f) : FLinearColor::White);
+    AddRow(OutRows, TEXT("InputLocked"), BoolToOnOff(Pawn->IsInputLocked()), Pawn->IsInputLocked() ? FLinearColor::Yellow : FLinearColor::White);
 }
 
 void UCaddyVehicleDebugPanelProvider::GatherInputRows(TArray<FDebugFrameworkPanelRow>& OutRows) const
@@ -192,9 +193,12 @@ void UCaddyVehicleDebugPanelProvider::GatherTuningRows(TArray<FDebugFrameworkPan
 
     const UCaddyVehicleTuningDataAsset* TuningAsset = MovementComponent->GetTuningDataAsset();
     const UCaddyVehicleSkillConfigDataAsset* SkillConfigAsset = Pawn->GetSkillConfigDataAsset();
+    const bool bPresetOverridesVisualConfig = Pawn->GetRuntimeTuningPresetCount() > 0 && Pawn->GetActiveRuntimeTuningPresetIndex() >= 0;
     AddRow(OutRows, TEXT("TuningAsset"), TuningAsset ? TuningAsset->GetName() : TEXT("None"));
+    AddRow(OutRows, TEXT("TuningAssetPath"), TuningAsset ? TuningAsset->GetPathName() : TEXT("None"));
     AddRow(OutRows, TEXT("SkillConfigAsset"), SkillConfigAsset ? SkillConfigAsset->GetName() : TEXT("None"));
     AddRow(OutRows, TEXT("PresetCount"), FString::Printf(TEXT("%d"), Pawn->GetRuntimeTuningPresetCount()));
+    AddRow(OutRows, TEXT("PresetOverridesFeelCam"), BoolToOnOff(bPresetOverridesVisualConfig));
     AddRow(
         OutRows,
         TEXT("ActivePreset"),
@@ -267,14 +271,36 @@ void UCaddyVehicleDebugPanelProvider::GatherFeelRows(TArray<FDebugFrameworkPanel
     AddRow(OutRows, TEXT("AccelAlpha"), FString::Printf(TEXT("%.2f"), FeelComponent->GetCurrentForwardAccelAlpha()));
     AddRow(OutRows, TEXT("SpeedStretch"), FString::Printf(TEXT("%.2f"), FeelComponent->GetCurrentSpeedStretchAlpha()));
     AddRow(OutRows, TEXT("LeanRollDeg"), FString::Printf(TEXT("%.2f"), FeelComponent->GetCurrentLeanRollDeg()));
+    AddRow(OutRows, TEXT("LeanComposedDeg"), FString::Printf(TEXT("%.2f"), FeelComponent->GetCurrentComposedLeanRollDeg()));
+    AddRow(OutRows, TEXT("ImpactPitchDeg"), FString::Printf(TEXT("%.2f"), FeelComponent->GetCurrentImpactPitchDeg()));
+    AddRow(OutRows, TEXT("ImpactRollDeg"), FString::Printf(TEXT("%.2f"), FeelComponent->GetCurrentImpactRollDeg()));
+    AddRow(OutRows, TEXT("ImpactRollInput"), FString::Printf(TEXT("%.2f"), FeelComponent->GetCurrentImpactRollInput()));
+    AddRow(OutRows, TEXT("ImpactRollMoveSide"), FString::Printf(TEXT("%.2f"), FeelComponent->GetCurrentImpactRollSideFromMovement()));
+    AddRow(OutRows, TEXT("ImpactRollImpulse"), FString::Printf(TEXT("%.2f"), FeelComponent->GetCurrentImpactRollImpulseDeg()));
     AddRow(OutRows, TEXT("ImpactStrength"), FString::Printf(TEXT("%.2f"), FeelComponent->GetCurrentImpactStrength()));
+    AddRow(OutRows, TEXT("HitStopRemain"), FString::Printf(TEXT("%.3f"), FeelComponent->GetHitStopTimeRemaining()));
+    AddRow(OutRows, TEXT("HitStopDilation"), FString::Printf(TEXT("%.2f"), FeelComponent->GetHitStopTimeDilation()));
+    AddRow(OutRows, TEXT("StaggerActive"), BoolToOnOff(FeelComponent->IsStaggerActive()), FeelComponent->IsStaggerActive() ? FLinearColor::Yellow : FLinearColor::White);
+    AddRow(OutRows, TEXT("StaggerRemain"), FString::Printf(TEXT("%.3f"), FeelComponent->GetStaggerTimeRemaining()));
+    AddRow(OutRows, TEXT("StaggerYaw"), FString::Printf(TEXT("%.2f"), FeelComponent->GetCurrentStaggerYaw()));
 
     const FVector Offset = FeelComponent->GetCurrentLocationOffset();
     const FRotator RotationOffset = FeelComponent->GetCurrentRotationOffset();
     const FVector ScaleMultiplier = FeelComponent->GetCurrentScaleMultiplier();
+    const FVector ImpactWorldNormal = FeelComponent->GetCurrentImpactWorldNormal();
+    const FVector ImpactLocalNormal = FeelComponent->GetCurrentImpactLocalNormal();
     AddRow(OutRows, TEXT("LocOffset"), FString::Printf(TEXT("(%.2f, %.2f, %.2f)"), Offset.X, Offset.Y, Offset.Z));
     AddRow(OutRows, TEXT("RotOffset"), FString::Printf(TEXT("(%.2f, %.2f, %.2f)"), RotationOffset.Pitch, RotationOffset.Yaw, RotationOffset.Roll));
+    AddRow(OutRows, TEXT("AppliedRollDeg"), FString::Printf(TEXT("%.2f"), RotationOffset.Roll));
     AddRow(OutRows, TEXT("ScaleMult"), FString::Printf(TEXT("(%.3f, %.3f, %.3f)"), ScaleMultiplier.X, ScaleMultiplier.Y, ScaleMultiplier.Z));
+    AddRow(OutRows, TEXT("ImpactWorldN"), FString::Printf(TEXT("(%.2f, %.2f, %.2f)"), ImpactWorldNormal.X, ImpactWorldNormal.Y, ImpactWorldNormal.Z));
+    AddRow(OutRows, TEXT("ImpactLocalN"), FString::Printf(TEXT("(%.2f, %.2f, %.2f)"), ImpactLocalNormal.X, ImpactLocalNormal.Y, ImpactLocalNormal.Z));
+    const FVector LastEventNormalWorld = FeelComponent->GetLastCollisionFeelEventNormalWorld();
+    AddRow(OutRows, TEXT("FeelEventCount"), FString::Printf(TEXT("%d"), FeelComponent->GetCollisionFeelEventCount()));
+    AddRow(OutRows, TEXT("FeelEventAge"), FeelComponent->GetLastCollisionFeelEventAgeSeconds() >= 0.0f
+        ? FString::Printf(TEXT("%.3f"), FeelComponent->GetLastCollisionFeelEventAgeSeconds())
+        : TEXT("n/a"));
+    AddRow(OutRows, TEXT("LastEventWorldN"), FString::Printf(TEXT("(%.2f, %.2f, %.2f)"), LastEventNormalWorld.X, LastEventNormalWorld.Y, LastEventNormalWorld.Z));
 
     AddRow(OutRows, TEXT("Cfg Eng Enabled"), BoolToOnOff(FeelComponent->FeelConfig.EngineScaleVibration.bEnableEngineScaleVibration));
     AddRow(OutRows, TEXT("Cfg Eng BaseVar"), FString::Printf(TEXT("%.4f"), FeelComponent->FeelConfig.EngineScaleVibration.BaseVariance));
@@ -297,6 +323,23 @@ void UCaddyVehicleDebugPanelProvider::GatherFeelRows(TArray<FDebugFrameworkPanel
     AddRow(OutRows, TEXT("Cfg ImpactDuration"), FString::Printf(TEXT("%.2f"), FeelComponent->FeelConfig.ImpactPulseDuration));
     AddRow(OutRows, TEXT("Cfg ImpactScale"), FString::Printf(TEXT("%.2f"), FeelComponent->FeelConfig.ImpactPulseScale));
     AddRow(OutRows, TEXT("Cfg ImpactKick"), FString::Printf(TEXT("%.1f"), FeelComponent->FeelConfig.ImpactPulseLocationKick));
+    AddRow(OutRows, TEXT("Cfg ImpactFallback"), BoolToOnOff(FeelComponent->FeelConfig.bUseMovementCollisionImpactPulseFallback));
+    AddRow(OutRows, TEXT("Cfg ImpactPitchSign"), FString::Printf(TEXT("%.2f"), FeelComponent->FeelConfig.ImpactPulsePitchDirection));
+    AddRow(OutRows, TEXT("Cfg ImpactRollSign"), FString::Printf(TEXT("%.2f"), FeelComponent->FeelConfig.ImpactPulseRollDirection));
+    AddRow(OutRows, TEXT("Cfg RollUseSideOnly"), BoolToOnOff(FeelComponent->FeelConfig.bImpactRollUseSideSignOnly));
+    AddRow(OutRows, TEXT("Cfg RollPreferMove"), BoolToOnOff(FeelComponent->FeelConfig.bPreferMovementHitSideForRoll));
+    AddRow(OutRows, TEXT("Cfg RollOverrideLean"), BoolToOnOff(FeelComponent->FeelConfig.bOverrideLeanWhileImpactActive));
+    AddRow(OutRows, TEXT("Cfg RollImpulseDeg"), FString::Printf(TEXT("%.2f"), FeelComponent->FeelConfig.ImpactRollImpulseOnEventDeg));
+    AddRow(OutRows, TEXT("Cfg RollImpulseDecay"), FString::Printf(TEXT("%.2f"), FeelComponent->FeelConfig.ImpactRollImpulseDecaySpeed));
+    AddRow(OutRows, TEXT("Cfg LeanMulAtImpact"), FString::Printf(TEXT("%.2f"), FeelComponent->FeelConfig.LeanMultiplierAtMaxImpact));
+    AddRow(OutRows, TEXT("Cfg HitStopDur"), FString::Printf(TEXT("%.3f"), FeelComponent->FeelConfig.CollisionFeel.HitStopDuration));
+    AddRow(OutRows, TEXT("Cfg HitStopDilation"), FString::Printf(TEXT("%.2f"), FeelComponent->FeelConfig.CollisionFeel.HitStopTimeDilation));
+    AddRow(OutRows, TEXT("Cfg CameraShake"), FeelComponent->FeelConfig.CollisionFeel.CameraShakeClass
+        ? FeelComponent->FeelConfig.CollisionFeel.CameraShakeClass->GetName()
+        : TEXT("None"));
+    AddRow(OutRows, TEXT("Cfg StaggerCurve"), FeelComponent->FeelConfig.StaggerFeel.StaggerYawAlphaCurve
+        ? FeelComponent->FeelConfig.StaggerFeel.StaggerYawAlphaCurve->GetName()
+        : TEXT("None"));
 }
 
 void UCaddyVehicleDebugPanelProvider::GatherSkillRows(TArray<FDebugFrameworkPanelRow>& OutRows) const
@@ -455,6 +498,11 @@ void UCaddyVehicleDebugPanelProvider::GatherCollisionRows(TArray<FDebugFramework
     AddRow(OutRows, TEXT("HitRegisterEnabled"), BoolToOnOff(MovementComponent->CollisionConfig.HitRegister.bEnableCollisionHitRegister));
     const UHitRegisterPipeline* HitRegisterPipeline = MovementComponent->CollisionHitRegisterPipeline.Get();
     AddRow(OutRows, TEXT("HR Pipeline"), HitRegisterPipeline ? HitRegisterPipeline->GetName() : TEXT("None"));
+    AddRow(OutRows, TEXT("HR PipelinePath"), HitRegisterPipeline ? HitRegisterPipeline->GetPathName() : TEXT("None"));
+    AddRow(OutRows, TEXT("HR AllowDefault"), BoolToOnOff(MovementComponent->CollisionConfig.HitRegister.bAllowDefaultPipelineFallback));
+    AddRow(OutRows, TEXT("HR UsedDefault"), BoolToOnOff(MovementComponent->WasLastCollisionUsingDefaultPipeline()));
+    AddRow(OutRows, TEXT("HR FeelNodeExecuted"), BoolToOnOff(MovementComponent->DidLastCollisionFeelNodeExecute()));
+    AddRow(OutRows, TEXT("HR FeelRecipients"), FString::Printf(TEXT("%d"), MovementComponent->GetLastCollisionFeelRecipientCount()));
     AddRow(OutRows, TEXT("HitRegisterTriggered"), BoolToOnOff(MovementComponent->DidLastCollisionTriggerHitRegister()));
     AddRow(
         OutRows,

@@ -95,6 +95,9 @@ struct FCaddyVehicleCollisionHitRegisterConfig
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Collision|HitRegister", meta=(ClampMin="0.0", ToolTip="Minimum time between collision hit events, in seconds."))
     float EventCooldownSeconds = 0.2f;
 
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Collision|HitRegister", meta=(ToolTip="Allow fallback to global default HitRegister pipeline when explicit CollisionHitRegisterPipeline is null. Disable to enforce explicit project pipeline usage."))
+    bool bAllowDefaultPipelineFallback = false;
+
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Collision|HitRegister", meta=(ToolTip="Always-applied gameplay tags attached to emitted collision hit events before pipeline processing."))
     FGameplayTagContainer BaseTags;
 
@@ -291,6 +294,9 @@ public:
     bool DidLastCollisionHitRegisterSucceed() const { return bLastCollisionHitRegisterSucceeded; }
 
     UFUNCTION(BlueprintPure, Category="Vehicle|Collision")
+    bool WasLastCollisionUsingDefaultPipeline() const { return bLastCollisionUsedDefaultPipeline; }
+
+    UFUNCTION(BlueprintPure, Category="Vehicle|Collision")
     float GetLastCollisionSpeed() const { return LastBlockingHitSpeed; }
 
     UFUNCTION(BlueprintPure, Category="Vehicle|Collision")
@@ -307,6 +313,12 @@ public:
 
     UFUNCTION(BlueprintPure, Category="Vehicle|Collision")
     ECaddyVehicleCollisionImpactTier GetLastCollisionImpactTier() const { return LastCollisionImpactTier; }
+
+    UFUNCTION(BlueprintPure, Category="Vehicle|Collision")
+    int32 GetLastCollisionFeelRecipientCount() const { return LastCollisionFeelRecipientCount; }
+
+    UFUNCTION(BlueprintPure, Category="Vehicle|Collision")
+    bool DidLastCollisionFeelNodeExecute() const { return bLastCollisionFeelNodeExecuted; }
 
     UFUNCTION(BlueprintPure, Category="Vehicle|Collision")
     bool WasLastCollisionTargetVehicle() const { return bLastCollisionTargetWasVehicle; }
@@ -329,11 +341,20 @@ public:
     UFUNCTION(BlueprintPure, Category="Vehicle|Collision")
     FString GetLastCollisionActorName() const;
 
+    UFUNCTION(BlueprintPure, Category="Vehicle|Collision")
+    const AActor* GetLastCollisionActor() const { return LastBlockingHitActor.Get(); }
+
     UFUNCTION(BlueprintCallable, Category="Vehicle|Skill")
     void SetExternalVelocityControlEnabled(bool bEnabled);
 
     UFUNCTION(BlueprintPure, Category="Vehicle|Skill")
     bool IsExternalVelocityControlEnabled() const { return bExternalVelocityControlEnabled; }
+
+    UFUNCTION(BlueprintCallable, Category="Vehicle|State")
+    void SetControlLockEnabled(bool bEnabled);
+
+    UFUNCTION(BlueprintPure, Category="Vehicle|State")
+    bool IsControlLocked() const { return bControlLockEnabled; }
 
     UFUNCTION(BlueprintCallable, Category="Vehicle|Skill")
     void SetExternalPlanarVelocityWorld(const FVector& InWorldVelocity);
@@ -387,6 +408,8 @@ private:
     float LastCollisionEffectiveNormalSpeed = 0.0f;
     float LastCollisionImpactScore = 0.0f;
     ECaddyVehicleCollisionImpactTier LastCollisionImpactTier = ECaddyVehicleCollisionImpactTier::None;
+    int32 LastCollisionFeelRecipientCount = 0;
+    bool bLastCollisionFeelNodeExecuted = false;
     bool bLastCollisionTargetWasVehicle = false;
     bool bLastCollisionAttackerWasDashing = false;
     FVector LastBlockingHitLocation = FVector::ZeroVector;
@@ -395,6 +418,8 @@ private:
     TWeakObjectPtr<AActor> LastBlockingHitActor;
     bool bLastCollisionTriggeredHitRegister = false;
     bool bLastCollisionHitRegisterSucceeded = false;
+    bool bLastCollisionUsedDefaultPipeline = false;
     FString LastCollisionHitRegisterStatus = TEXT("n/a");
     bool bExternalVelocityControlEnabled = false;
+    bool bControlLockEnabled = false;
 };
