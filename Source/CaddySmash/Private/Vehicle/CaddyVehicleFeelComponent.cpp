@@ -646,9 +646,44 @@ void UCaddyVehicleFeelComponent::TriggerCollisionFeel(
         return;
     }
 
-    if (const APawn* OwnerPawn = Cast<APawn>(GetOwner()))
     {
-        float RollInput = FVector::DotProduct(ResolvedImpactNormal, OwnerPawn->GetActorRightVector().GetSafeNormal2D());
+        // Use the same side basis as runtime pulse roll so initial event impulse does not flip direction.
+        FVector RollBasisRight = FVector::ZeroVector;
+        if (const USceneComponent* Visual = VisualComponent.Get())
+        {
+            RollBasisRight = Visual->GetRightVector().GetSafeNormal2D();
+        }
+        if (RollBasisRight.IsNearlyZero())
+        {
+            if (const APawn* OwnerPawn = Cast<APawn>(GetOwner()))
+            {
+                RollBasisRight = OwnerPawn->GetActorRightVector().GetSafeNormal2D();
+            }
+        }
+
+        float RollInput = !RollBasisRight.IsNearlyZero()
+            ? FVector::DotProduct(ResolvedImpactNormal, RollBasisRight)
+            : 0.0f;
+
+        if (FeelConfig.bPreferMovementHitSideForRoll)
+        {
+            const UArcadeVehicleMovementComponent* Movement = MovementComponent.Get();
+            const AActor* OwnerActor = GetOwner();
+            if (Movement && OwnerActor)
+            {
+                const float Age = Movement->GetTimeSinceLastBlockingHit();
+                const AActor* OtherActor = Movement->GetLastCollisionActor();
+                if (Age >= 0.0f && Age <= 0.20f && OtherActor && !RollBasisRight.IsNearlyZero())
+                {
+                    const FVector ToOther = (OtherActor->GetActorLocation() - OwnerActor->GetActorLocation()).GetSafeNormal2D();
+                    if (!ToOther.IsNearlyZero())
+                    {
+                        RollInput = FVector::DotProduct(ToOther, RollBasisRight);
+                    }
+                }
+            }
+        }
+
         if (FeelConfig.bImpactRollUseSideSignOnly && !FMath::IsNearlyZero(RollInput, KINDA_SMALL_NUMBER))
         {
             RollInput = FMath::Sign(RollInput);

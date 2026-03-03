@@ -74,7 +74,7 @@ struct FCaddyVehicleBrakeDashSkillConfig
     bool bEnableBrakeDashSkill = true;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Skill|BrakeDash", meta=(ToolTip="Trigger source mode for entering the skill."))
-    ECaddyVehicleSkillTriggerMode TriggerMode = ECaddyVehicleSkillTriggerMode::BrakeThrottleCombo;
+    ECaddyVehicleSkillTriggerMode TriggerMode = ECaddyVehicleSkillTriggerMode::InputActionHold;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Skill|BrakeDash|Combo", meta=(ClampMin="0.0", ClampMax="1.0", ToolTip="Throttle threshold required when TriggerMode is BrakeThrottleCombo."))
     float TriggerThrottleThreshold = 0.85f;

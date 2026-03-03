@@ -18,7 +18,7 @@ class UCaddyVehicleDebugPanelProvider;
 class UCaddyVehicleSkillConfigDataAsset;
 class UCaddyVehicleTuningDataAsset;
 class UCameraComponent;
-class UCapsuleComponent;
+class UBoxComponent;
 class UInputAction;
 class UInputMappingContext;
 class USpringArmComponent;
@@ -109,8 +109,11 @@ public:
     void Multicast_EndStagger();
 
 protected:
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Vehicle|Collision", meta=(ClampMin="1.0"))
+    FVector CollisionBoxExtent = FVector(92.0f, 56.0f, 35.0f);
+
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Vehicle|Components")
-    TObjectPtr<UCapsuleComponent> CollisionComponent;
+    TObjectPtr<UBoxComponent> CollisionComponent;
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Vehicle|Components")
     TObjectPtr<UStaticMeshComponent> VehicleMeshComponent;
@@ -187,6 +190,15 @@ protected:
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Vehicle|Input|Enhanced")
     TObjectPtr<UInputAction> SkillInputAction = nullptr;
 
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Vehicle|Visual|LocalPlayer")
+    bool bEnableLocalPlayerMeshTint = true;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Vehicle|Visual|LocalPlayer")
+    TArray<FLinearColor> LocalPlayerMeshTints;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Vehicle|Visual|LocalPlayer")
+    FName MeshTintParameterName = FName(TEXT("BaseColor"));
+
 private:
     void GrantOrRefreshSkillAbility();
     void ClearGrantedSkillAbility();
@@ -196,8 +208,11 @@ private:
     void ClearGrantedStaggerAbility();
     void InitializeVehicleAttributes();
     bool TryActivateSkillAbility();
-    bool IsSkillComboTriggerHeld() const;
     void SetInputLocked(bool bLocked);
+    void HandleSkillInputPressed();
+    void HandleSkillInputReleased();
+    void ApplyLocalPlayerMeshTint();
+    int32 ResolveLocalPlayerColorIndex() const;
 
     UFUNCTION(Server, Unreliable)
     void ServerSetMoveIntent(FVector2D InMoveIntent);
@@ -228,6 +243,8 @@ private:
     void InputDriftAction(const FInputActionValue& Value);
     void InputSkillStartedAction(const FInputActionValue& Value);
     void InputSkillCompletedAction(const FInputActionValue& Value);
+    void InputSkillPressedLegacy();
+    void InputSkillReleasedLegacy();
     void InitializeEnhancedInputMapping();
     FVector2D ComputeWorldMoveIntent(const FVector2D& InRawMoveInput) const;
     void ApplyVisualConfigsFromTuningAsset(const UCaddyVehicleTuningDataAsset* TuningAsset);
