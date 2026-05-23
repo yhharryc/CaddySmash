@@ -197,6 +197,7 @@ void UArcadeVehicleMovementComponent::SetControlLockEnabled(const bool bEnabled)
         bIsDrifting = false;
         bHasMoveIntent = false;
         MoveIntentWorldDir = FVector2D::ZeroVector;
+        bReverseSteeringActive = false;
     }
 }
 
@@ -248,7 +249,10 @@ void UArcadeVehicleMovementComponent::UpdateSteering(float DeltaTime, float Plan
     const float SteeringRateDegPerSec = bIsDrifting
         ? HandlingConfig.SteeringRateDegPerSec * HandlingConfig.DriftSteeringRateMultiplier
         : HandlingConfig.SteeringRateDegPerSec;
-    const float TargetYaw = FMath::RadiansToDegrees(FMath::Atan2(MoveIntentWorldDir.Y, MoveIntentWorldDir.X));
+    const float InputYaw = FMath::RadiansToDegrees(FMath::Atan2(MoveIntentWorldDir.Y, MoveIntentWorldDir.X));
+    const float TargetYaw = bReverseSteeringActive
+        ? FRotator::NormalizeAxis(InputYaw + 180.0f)
+        : InputYaw;
     const float CurrentYaw = UpdatedComponent->GetComponentRotation().Yaw;
     const float NewYaw = FMath::FixedTurn(CurrentYaw, TargetYaw, SteeringRateDegPerSec * DeltaTime);
     UpdatedComponent->SetWorldRotation(FRotator(0.0f, NewYaw, 0.0f));
@@ -258,9 +262,11 @@ void UArcadeVehicleMovementComponent::UpdateVelocity(float DeltaTime)
 {
     const FRotator ActorRot = UpdatedComponent->GetComponentRotation();
     FVector LocalVelocity = ActorRot.UnrotateVector(Velocity);
+    const float PreviousForwardSpeed = LocalVelocity.X;
 
     const bool bHasThrottle = ThrottleInput > KINDA_SMALL_NUMBER;
     const bool bHasBrakeReverse = BrakeReverseInput > KINDA_SMALL_NUMBER;
+    const bool bWantsReverse = bHasBrakeReverse && !bHasThrottle;
 
     if (bHasThrottle && !bHasBrakeReverse)
     {
@@ -297,6 +303,35 @@ void UArcadeVehicleMovementComponent::UpdateVelocity(float DeltaTime)
 
     LocalVelocity.X *= FMath::Max(0.0f, 1.0f - (HandlingConfig.LinearDrag * DeltaTime));
     LocalVelocity.X = FMath::Clamp(LocalVelocity.X, -GasConfig.MaxReverseSpeed, GasConfig.MaxForwardSpeed);
+
+    if (HandlingConfig.bEnableInputRelativeReverseSteering)
+    {
+        const float EnterSpeed = FMath::Max(0.0f, HandlingConfig.ReverseSteeringEnterSpeed);
+        const float ExitSpeed = FMath::Clamp(HandlingConfig.ReverseSteeringExitSpeed, 0.0f, EnterSpeed);
+        const bool bApplyingReverseAcceleration = bWantsReverse
+            && PreviousForwardSpeed <= 0.0f
+            && (LocalVelocity.X < (PreviousForwardSpeed - KINDA_SMALL_NUMBER));
+
+        if (!bReverseSteeringActive)
+        {
+            if (bApplyingReverseAcceleration && LocalVelocity.X <= -EnterSpeed)
+            {
+                bReverseSteeringActive = true;
+            }
+        }
+        else
+        {
+            const bool bWantsForwardDrive = bHasThrottle && !bHasBrakeReverse;
+            if (bWantsForwardDrive || LocalVelocity.X >= -ExitSpeed)
+            {
+                bReverseSteeringActive = false;
+            }
+        }
+    }
+    else
+    {
+        bReverseSteeringActive = false;
+    }
 
     const float LateralFrictionInterpSpeed = bIsDrifting
         ? HandlingConfig.DriftLateralFrictionInterpSpeed

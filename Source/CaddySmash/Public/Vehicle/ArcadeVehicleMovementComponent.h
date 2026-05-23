@@ -60,6 +60,15 @@ struct FCaddyVehicleHandlingConfig
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Handling|Drift", meta=(ClampMin="0.0", ClampMax="1.0", ToolTip="Minimum drift input value needed to enter/maintain drift state."))
     float DriftInputThreshold = 0.15f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Handling|Reverse", meta=(ToolTip="When enabled, reverse steering maps move intent to reverse travel direction after confirmed reverse acceleration state."))
+    bool bEnableInputRelativeReverseSteering = true;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Handling|Reverse", meta=(ClampMin="0.0", ToolTip="Minimum reverse speed (cm/s) required to enter input-relative reverse steering once reverse acceleration is detected."))
+    float ReverseSteeringEnterSpeed = 120.0f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Handling|Reverse", meta=(ClampMin="0.0", ToolTip="Reverse steering exits when reverse speed magnitude drops below this threshold (cm/s), or reverse input is released."))
+    float ReverseSteeringExitSpeed = 70.0f;
 };
 
 UENUM(BlueprintType)
@@ -422,4 +431,5 @@ private:
     FString LastCollisionHitRegisterStatus = TEXT("n/a");
     bool bExternalVelocityControlEnabled = false;
     bool bControlLockEnabled = false;
+    bool bReverseSteeringActive = false;
 };
