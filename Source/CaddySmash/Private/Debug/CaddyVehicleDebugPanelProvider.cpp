@@ -177,6 +177,15 @@ void UCaddyVehicleDebugPanelProvider::GatherInputRows(TArray<FDebugFrameworkPane
     AddRow(OutRows, TEXT("ThrottleInput"), FString::Printf(TEXT("%.2f"), MovementComponent->GetThrottleInput()));
     AddRow(OutRows, TEXT("BrakeReverseInput"), FString::Printf(TEXT("%.2f"), MovementComponent->GetBrakeReverseInput()));
     AddRow(OutRows, TEXT("DriftInput"), FString::Printf(TEXT("%.2f"), MovementComponent->GetDriftInput()));
+    AddRow(OutRows, TEXT("DriftRawInput"), FString::Printf(TEXT("%.2f"), Pawn->GetRawDriftInput()));
+    AddRow(
+        OutRows,
+        TEXT("DriftInvert"),
+        Pawn->IsDriftInputInverted() ? TEXT("On (default-drift)") : TEXT("Off (hold-to-drift)"),
+        Pawn->IsDriftInputInverted() ? FLinearColor(1.0f, 0.4f, 0.9f, 1.0f) : FLinearColor::White);
+    AddRow(OutRows, TEXT("DriftInvertHotkey"), TEXT("T  /  Gamepad R3"), FLinearColor(0.75f, 0.85f, 1.0f, 1.0f));
+    AddRow(OutRows, TEXT("DriftInvertToggle"), TEXT("caddy.vehicle.drift.invert.toggle"), FLinearColor(0.75f, 0.85f, 1.0f, 1.0f));
+    AddRow(OutRows, TEXT("DriftInvertSet"), TEXT("caddy.vehicle.drift.invert <0|1>"), FLinearColor(0.75f, 0.85f, 1.0f, 1.0f));
     AddRow(OutRows, TEXT("DriftThreshold"), FString::Printf(TEXT("%.2f"), MovementComponent->HandlingConfig.DriftInputThreshold));
     AddRow(OutRows, TEXT("SteerMinSpeed"), FString::Printf(TEXT("%.1f"), MovementComponent->HandlingConfig.MinSpeedForSteering));
 }

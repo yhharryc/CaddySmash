@@ -168,6 +168,59 @@ namespace CaddyVehicleTuningConsole
         TEXT("caddy.vehicle.tuning.set"),
         TEXT("Set runtime vehicle tuning preset by index. Usage: caddy.vehicle.tuning.set <index>"),
         FConsoleCommandWithArgsDelegate::CreateStatic(&SetPresetByArgs));
+
+    static void SetDriftInvertByArgs(const TArray<FString>& Args)
+    {
+        ACaddyVehiclePawn* Pawn = FindLocalVehiclePawn(nullptr);
+        if (!Pawn)
+        {
+            UE_LOG(LogTemp, Warning, TEXT("caddy.vehicle.drift.invert: no local ACaddyVehiclePawn found."));
+            return;
+        }
+
+        if (Args.Num() < 1)
+        {
+            UE_LOG(LogTemp, Warning, TEXT("Usage: caddy.vehicle.drift.invert <0|1>"));
+            return;
+        }
+
+        const bool bInverted = FCString::Atoi(*Args[0]) != 0;
+        Pawn->SetDriftInputInverted(bInverted);
+
+        UE_LOG(
+            LogTemp,
+            Display,
+            TEXT("caddy.vehicle.drift.invert: %s"),
+            Pawn->IsDriftInputInverted() ? TEXT("On (default-drift)") : TEXT("Off (hold-to-drift)"));
+    }
+
+    static void ToggleDriftInvert()
+    {
+        ACaddyVehiclePawn* Pawn = FindLocalVehiclePawn(nullptr);
+        if (!Pawn)
+        {
+            UE_LOG(LogTemp, Warning, TEXT("caddy.vehicle.drift.invert.toggle: no local ACaddyVehiclePawn found."));
+            return;
+        }
+
+        Pawn->SetDriftInputInverted(!Pawn->IsDriftInputInverted());
+
+        UE_LOG(
+            LogTemp,
+            Display,
+            TEXT("caddy.vehicle.drift.invert: %s"),
+            Pawn->IsDriftInputInverted() ? TEXT("On (default-drift)") : TEXT("Off (hold-to-drift)"));
+    }
+
+    static FAutoConsoleCommand CCmdVehicleDriftInvert(
+        TEXT("caddy.vehicle.drift.invert"),
+        TEXT("Set drift-input invert mode. 1 = drift on by default / release L1 to drift, 0 = hold L1 to drift."),
+        FConsoleCommandWithArgsDelegate::CreateStatic(&SetDriftInvertByArgs));
+
+    static FAutoConsoleCommand CCmdVehicleDriftInvertToggle(
+        TEXT("caddy.vehicle.drift.invert.toggle"),
+        TEXT("Toggle drift-input invert mode."),
+        FConsoleCommandDelegate::CreateStatic(&ToggleDriftInvert));
 }
 
 ACaddyVehiclePawn::ACaddyVehiclePawn()
@@ -280,6 +333,7 @@ void ACaddyVehiclePawn::BeginPlay()
     RegisterDebugProviders();
     InitializeEnhancedInputMapping();
     ApplyLocalPlayerMeshTint();
+    ApplyDriftInputToMovement();
 }
 
 void ACaddyVehiclePawn::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -408,6 +462,10 @@ void ACaddyVehiclePawn::SetupPlayerInputComponent(UInputComponent* PlayerInputCo
     // Ensure skill has a dedicated gamepad binding independent from throttle/brake.
     PlayerInputComponent->BindKey(EKeys::Gamepad_FaceButton_Top, IE_Pressed, this, &ACaddyVehiclePawn::InputSkillPressedLegacy);
     PlayerInputComponent->BindKey(EKeys::Gamepad_FaceButton_Top, IE_Released, this, &ACaddyVehiclePawn::InputSkillReleasedLegacy);
+
+    // Hotkey to toggle drift-input invert mode (default-drift vs hold-to-drift).
+    PlayerInputComponent->BindKey(EKeys::T, IE_Pressed, this, &ACaddyVehiclePawn::InputToggleDriftInvert);
+    PlayerInputComponent->BindKey(EKeys::Gamepad_RightThumbstick, IE_Pressed, this, &ACaddyVehiclePawn::InputToggleDriftInvert);
 }
 
 UPawnMovementComponent* ACaddyVehiclePawn::GetMovementComponent() const
@@ -693,21 +751,36 @@ void ACaddyVehiclePawn::SetThrottleInput(float InThrottle)
 
 void ACaddyVehiclePawn::SetDriftInput(float InDrift)
 {
+    RawDriftInput = FMath::Clamp(InDrift, 0.0f, 1.0f);
+    ApplyDriftInputToMovement();
+}
+
+void ACaddyVehiclePawn::SetDriftInputInverted(bool bInverted)
+{
+    if (bInvertDriftInput == bInverted)
+    {
+        return;
+    }
+
+    bInvertDriftInput = bInverted;
+    ApplyDriftInputToMovement();
+}
+
+void ACaddyVehiclePawn::ApplyDriftInputToMovement()
+{
     if (!VehicleMovementComponent)
     {
         return;
     }
 
-    if (bInputLocked)
-    {
-        VehicleMovementComponent->SetDriftInput(0.0f);
-        return;
-    }
+    const float Effective = bInputLocked
+        ? 0.0f
+        : (bInvertDriftInput ? (1.0f - RawDriftInput) : RawDriftInput);
 
-    VehicleMovementComponent->SetDriftInput(InDrift);
+    VehicleMovementComponent->SetDriftInput(Effective);
     if (!HasAuthority())
     {
-        ServerSetDriftInput(InDrift);
+        ServerSetDriftInput(Effective);
     }
 }
 
@@ -985,6 +1058,16 @@ void ACaddyVehiclePawn::InputBrakeReverseAction(const FInputActionValue& Value)
 void ACaddyVehiclePawn::InputDriftAction(const FInputActionValue& Value)
 {
     SetDriftInput(FMath::Clamp(Value.Get<float>(), 0.0f, 1.0f));
+}
+
+void ACaddyVehiclePawn::InputToggleDriftInvert()
+{
+    SetDriftInputInverted(!bInvertDriftInput);
+    UE_LOG(
+        LogTemp,
+        Display,
+        TEXT("caddy.vehicle.drift.invert: %s"),
+        bInvertDriftInput ? TEXT("On (default-drift)") : TEXT("Off (hold-to-drift)"));
 }
 
 void ACaddyVehiclePawn::InputSkillStartedAction(const FInputActionValue& Value)

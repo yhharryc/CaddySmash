@@ -54,6 +54,15 @@ public:
     UFUNCTION(BlueprintCallable, Category="Vehicle|Input")
     void SetDriftInput(float InDrift);
 
+    UFUNCTION(BlueprintCallable, Category="Vehicle|Input")
+    void SetDriftInputInverted(bool bInverted);
+
+    UFUNCTION(BlueprintPure, Category="Vehicle|Input")
+    bool IsDriftInputInverted() const { return bInvertDriftInput; }
+
+    UFUNCTION(BlueprintPure, Category="Vehicle|Input")
+    float GetRawDriftInput() const { return RawDriftInput; }
+
     UFUNCTION(BlueprintPure, Category="Vehicle|Input")
     FVector2D GetRawMoveInput() const { return RawMoveInput; }
 
@@ -187,6 +196,9 @@ protected:
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Vehicle|Input|Enhanced")
     TObjectPtr<UInputAction> DriftInputAction = nullptr;
 
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Vehicle|Input")
+    bool bInvertDriftInput = true;
+
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Vehicle|Input|Enhanced")
     TObjectPtr<UInputAction> SkillInputAction = nullptr;
 
@@ -241,6 +253,7 @@ private:
     void InputAccelerateAction(const FInputActionValue& Value);
     void InputBrakeReverseAction(const FInputActionValue& Value);
     void InputDriftAction(const FInputActionValue& Value);
+    void InputToggleDriftInvert();
     void InputSkillStartedAction(const FInputActionValue& Value);
     void InputSkillCompletedAction(const FInputActionValue& Value);
     void InputSkillPressedLegacy();
@@ -252,6 +265,9 @@ private:
     void UnregisterDebugProviders();
 
     FVector2D RawMoveInput = FVector2D::ZeroVector;
+    float RawDriftInput = 0.0f;
+
+    void ApplyDriftInputToMovement();
 
     FGameplayAbilitySpecHandle SkillAbilitySpecHandle;
     FGameplayAbilitySpecHandle KnockbackAbilitySpecHandle;
