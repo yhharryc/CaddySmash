@@ -1,0 +1,2 @@
+#include "Vehicle/CaddyVehicleSkillConfigDataAsset.h"
+
