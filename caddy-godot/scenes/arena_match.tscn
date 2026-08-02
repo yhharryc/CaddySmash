@@ -1,10 +1,12 @@
-[gd_scene load_steps=7 format=3]
+[gd_scene load_steps=9 format=3]
 
 [ext_resource type="PackedScene" path="res://scenes/vehicle.tscn" id="1_vehicle"]
 [ext_resource type="Script" path="res://scripts/arena/circular_arena.gd" id="2_arena"]
 [ext_resource type="Script" path="res://scripts/camera/vehicle_camera_rig.gd" id="3_camera"]
 [ext_resource type="Script" path="res://scripts/match/match_manager.gd" id="4_match"]
 [ext_resource type="Script" path="res://scripts/ui/match_hud.gd" id="5_hud"]
+[ext_resource type="Resource" path="res://resources/tuning/camera_arena.tres" id="6_cam_tuning"]
+[ext_resource type="Script" path="res://scripts/debug/debug_menu.gd" id="7_debug"]
 
 [sub_resource type="Environment" id="Environment_main"]
 background_mode = 1
@@ -31,10 +33,8 @@ pillar_ring_radius = 12.0
 
 [node name="CameraRig" type="Node3D" parent="." node_paths=PackedStringArray("center_anchor")]
 script = ExtResource("3_camera")
-base_pitch_deg = -85.0
+tuning = ExtResource("6_cam_tuning")
 center_anchor = NodePath("../Arena")
-center_bias = 1.0
-fit_ground_radius = 30.0
 
 [node name="Camera3D" type="Camera3D" parent="CameraRig"]
 transform = Transform3D(1, 0, 0, 0, 0.0872, -0.9962, 0, 0.9962, 0.0872, 0, 29.99, 2.62)
@@ -74,3 +74,8 @@ text = ""
 horizontal_alignment = 1
 vertical_alignment = 1
 theme_override_font_sizes/font_size = 64
+
+[node name="DebugMenu" type="CanvasLayer" parent="." node_paths=PackedStringArray("match_manager", "camera_rig")]
+script = ExtResource("7_debug")
+match_manager = NodePath("../MatchManager")
+camera_rig = NodePath("../CameraRig")

@@ -103,6 +103,75 @@ pulse envelopes start and end at rest, and that `out_back`/`pulse_back` overshoo
 optional `Curve` override in `FeelTuning`, mirroring how UE exposed `UCurveFloat`
 with an analytic fallback.
 
+## Hit emphasis
+
+Three systems layered on top of the mesh deformation, all scaled by impact tier:
+
+- **`scripts/fx/hit_stop.gd`** (autoload `HitStop`) — a near-freeze followed by an
+  eased slow-motion tail. It must be a single owner: four cars colliding in one
+  frame would each write `Engine.time_scale` and the last would win, so requests
+  merge instead — strongest freeze, longest slow. It runs on real time from
+  `Time.get_ticks_usec()`, because the frame delta is itself scaled by what it
+  sets and would stretch the freeze indefinitely.
+- **Camera shake** — trauma on `VehicleCameraRig`, squared before use so small
+  knocks stay subtle and big ones spike. Driven by `FastNoiseLite`, not per-frame
+  random, which strobes and reads as a broken frame rather than an impact.
+- **`scripts/fx/impact_vfx.gd`** — spark burst plus a **spiky** star ring, built
+  in code and self-freeing. The ring is deliberately short and front-loaded: it
+  starts already at readable size, snaps outward on an exponential ease-out, then
+  holds its brightness and drops out late (`EASE_IN` on alpha). A slow, evenly
+  fading ring reads as a bubble rather than a hit. `spiky_ring_mesh` builds a flat
+  band with alternating spike and notch radii, directly in the XZ plane so it
+  needs no rotation.
+
+**The car swells on impact, it does not shrink.** The original port squashed it,
+which reads as the car *losing* rather than as it landing a hit. `impact_inflate`
+grows every axis and `impact_directional_bias` keeps the hit direction legible by
+growing the struck axis least. An inverted-hull outline flashes with the same
+envelope — built as separate mesh copies rather than a `next_pass`, because
+`MatchManager` replaces the body material to tint each player and would drop it.
+
+**Drift trails** (`scripts/fx/drift_trail.gd`) lay glowing skid ribbons from the
+rear wheels once lateral slip passes `slip_threshold`. Rebuilt each frame as an
+`ImmediateMesh`, sampled per metre travelled rather than per frame, `top_level`
+so the ribbon stays in world space instead of dragging behind the car. Tinted
+with the player colour, so a trail identifies its owner.
+
+**Charge anticipation** builds three things together off charge alpha, all through
+an ease so they load late: the body compresses, it shudders in time with the
+wiggle, and the wiggle itself accelerates from `charge_wiggle_base_hz` to
+`charge_wiggle_max_hz`. The tail swing yaws the body and shoves it laterally
+*against* that yaw, so the nose stays roughly planted and the back end swings.
+
+`ImpactFx` doses these once per hit. It listens to the *scored* car-on-car hit
+(`ImpactAdjudicator.impact_dealt`) for the full treatment, and separately to wall
+contact for sparks and a little shake — a wall scrape must never freeze the match.
+
+## Debug menu
+
+`scripts/debug/debug_menu.gd`, toggled with **F1**. Unreal's
+`UCaddyVehicleDebugPanelProvider` was read-only — it gathered label/value rows for
+Core, Input, Tuning, Feel, Skill, Camera, Collision and DebugDraw. Same areas
+here, but the tuning tabs are **editable and saveable**, which the Unreal version
+could not do.
+
+`TuningPanel` builds its rows by reflection over a Resource's
+`get_property_list()`, so any new `@export` in a tuning script appears with no
+extra work, `@export_group` becomes a section header, and `@export_range` supplies
+the spin box bounds. Edits write to the Resource immediately, and every car shares
+that instance, so a dragged value is felt at once.
+
+- **Dirty state** — any value differing from the last saved state is bold and
+  amber, shows its previous value inline, and marks its tab with `*`.
+- **Save** — pops a confirm dialog listing every pending change as
+  `property: old -> new`, then writes each changed Resource back to its `.tres`.
+- **Revert** — restores every edited value from the baseline.
+
+Camera settings moved out of node exports into a `CameraTuning` Resource for this
+reason: node properties cannot be saved without writing the whole scene, and the
+camera is exactly what needs tuning. `camera_arena.tres` is the anchored top-down
+shot, `camera_chase.tres` the original single-player chase camera.
+
 ## Arena
 
 `scripts/arena/circular_arena.gd` builds the round arena in code: a ring of flat

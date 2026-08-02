@@ -1,4 +1,4 @@
-[gd_scene load_steps=16 format=3]
+[gd_scene load_steps=20 format=3]
 
 [ext_resource type="Script" path="res://scripts/vehicle/arcade_vehicle.gd" id="1_vehicle"]
 [ext_resource type="Resource" path="res://resources/tuning/tuning_default.tres" id="2_tuning"]
@@ -11,6 +11,10 @@
 [ext_resource type="Resource" path="res://resources/tuning/combat_default.tres" id="9_combat_tuning"]
 [ext_resource type="Script" path="res://scripts/vehicle/vehicle_feel.gd" id="10_feel"]
 [ext_resource type="Resource" path="res://resources/tuning/feel_default.tres" id="11_feel_tuning"]
+[ext_resource type="Script" path="res://scripts/fx/impact_fx.gd" id="12_fx"]
+[ext_resource type="Resource" path="res://resources/tuning/impact_fx_default.tres" id="13_fx_tuning"]
+[ext_resource type="Script" path="res://scripts/fx/drift_trail.gd" id="14_trail"]
+[ext_resource type="Resource" path="res://resources/tuning/drift_trail_default.tres" id="15_trail_tuning"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_body"]
 size = Vector3(1.12, 0.7, 1.84)
@@ -69,6 +73,17 @@ vehicle = NodePath("..")
 visual_root = NodePath("../Visual")
 tuning = ExtResource("11_feel_tuning")
 skill = NodePath("../Skill")
+
+[node name="ImpactFx" type="Node" parent="." node_paths=PackedStringArray("vehicle", "adjudicator")]
+script = ExtResource("12_fx")
+vehicle = NodePath("..")
+adjudicator = NodePath("../Adjudicator")
+tuning = ExtResource("13_fx_tuning")
+
+[node name="DriftTrail" type="MeshInstance3D" parent="." node_paths=PackedStringArray("vehicle")]
+script = ExtResource("14_trail")
+vehicle = NodePath("..")
+tuning = ExtResource("15_trail_tuning")
 
 [node name="Driver" type="Node" parent="." node_paths=PackedStringArray("vehicle", "skill")]
 script = ExtResource("3_driver")

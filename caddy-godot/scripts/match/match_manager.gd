@@ -73,11 +73,15 @@ func _spawn_all() -> void:
 ## has to be a per-instance override or every car would change together.
 func _tint(vehicle: ArcadeVehicle, color: Color) -> void:
 	var body := vehicle.get_node_or_null("Visual/Body") as MeshInstance3D
-	if body == null:
-		return
-	var material := StandardMaterial3D.new()
-	material.albedo_color = color
-	body.set_surface_override_material(0, material)
+	if body != null:
+		var material := StandardMaterial3D.new()
+		material.albedo_color = color
+		body.set_surface_override_material(0, material)
+
+	# Skid ribbons take the player colour too, so a trail identifies its owner.
+	for child in vehicle.get_children():
+		if child is DriftTrail:
+			(child as DriftTrail).color = color
 
 
 func _on_player_destroyed(slot: PlayerSlot) -> void:

@@ -39,6 +39,11 @@ var _engine_phase := 0.0
 var _previous_forward_speed := 0.0
 ## Sampled once per frame from the change in forward speed.
 var _acceleration := 0.0
+## Advances faster the closer the charge gets to firing.
+var _charge_phase := 0.0
+## Inverted-hull copies of each mesh, shown only while an impact is playing.
+var _outlines: Array[MeshInstance3D] = []
+var _outline_materials: Array[StandardMaterial3D] = []
 
 
 func _ready() -> void:
@@ -54,6 +59,40 @@ func _ready() -> void:
 		vehicle.blocking_collision.connect(_on_blocking_collision)
 	if skill != null:
 		skill.dash_started.connect(_on_dash_started)
+
+	_build_outlines()
+
+
+## Inverted-hull outline: a copy of each mesh with front faces culled and the
+## surface grown along its normals, so it renders as a shell behind the car.
+## Built as separate nodes rather than a next_pass on the body material, because
+## MatchManager replaces that material to tint each player and would drop it.
+func _build_outlines() -> void:
+	if visual_root == null or not tuning.enable_impact_outline:
+		return
+
+	for child in visual_root.get_children():
+		var mesh_instance := child as MeshInstance3D
+		if mesh_instance == null or mesh_instance.mesh == null:
+			continue
+
+		var material := StandardMaterial3D.new()
+		material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		material.cull_mode = BaseMaterial3D.CULL_FRONT
+		material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		material.albedo_color = tuning.impact_outline_color
+		material.grow = true
+		material.grow_amount = 0.0
+
+		var outline := MeshInstance3D.new()
+		outline.mesh = mesh_instance.mesh
+		outline.transform = mesh_instance.transform
+		outline.material_override = material
+		outline.visible = false
+		visual_root.add_child(outline)
+
+		_outlines.append(outline)
+		_outline_materials.append(material)
 
 
 ## Fired for walls as well as cars, so scraping a wall still registers physically.
@@ -108,8 +147,12 @@ func _process(delta: float) -> void:
 
 	target_scale += _acceleration_deform()
 	target_scale += _engine_vibration(delta)
-	target_scale += _charge_anticipation()
+	target_scale += _charge_anticipation(delta)
 	target_rotation.z += _lateral_lean()
+
+	var swing: Dictionary = _charge_swing()
+	target_rotation.y += swing["yaw"]
+	target_position += swing["offset"]
 
 	# Continuous layers ease toward their target; one-shots are added raw so
 	# their own envelope controls the attack rather than the smoothing.
@@ -198,15 +241,39 @@ func _engine_vibration(delta: float) -> Vector3:
 	return Vector3(-wobble, wobble, -wobble * 0.5) * variance
 
 
-## Anticipation while the dash charges: the car compresses before it fires.
-func _charge_anticipation() -> Vector3:
+## Anticipation while the dash charges. Three things build together, all keyed
+## off charge alpha through an ease so they load late rather than linearly:
+## the body compresses, it shudders in time with the wiggle, and the wiggle
+## itself speeds up — which is what reads as the car straining to be let go.
+func _charge_anticipation(delta: float) -> Vector3:
 	if skill == null or not tuning.enable_dash_pulse:
+		_charge_phase = 0.0
 		return Vector3.ZERO
 	if skill.state != BrakeDashSkill.State.CHARGING:
+		_charge_phase = 0.0
 		return Vector3.ZERO
 
-	var squash := Easing.in_out_cubic(skill.current_charge_alpha) * tuning.dash_charge_squash
+	var alpha := Easing.in_out_cubic(clampf(skill.current_charge_alpha, 0.0, 1.0))
+	var frequency := lerpf(tuning.charge_wiggle_base_hz, tuning.charge_wiggle_max_hz, alpha)
+	_charge_phase += delta * frequency * TAU
+
+	var squash := alpha * tuning.dash_charge_squash
+	# Pumped in time with the wiggle so the compression visibly throbs.
+	squash += sin(_charge_phase * 2.0) * alpha * tuning.charge_shudder
 	return Vector3(squash * 0.5, squash * 0.35, -squash)
+
+
+## Tail swing: yaw the body, then shove it laterally against that yaw so the
+## nose stays roughly planted and the back end does the swinging.
+func _charge_swing() -> Dictionary:
+	if skill == null or skill.state != BrakeDashSkill.State.CHARGING:
+		return {"yaw": 0.0, "offset": Vector3.ZERO}
+
+	var alpha := Easing.in_out_cubic(clampf(skill.current_charge_alpha, 0.0, 1.0))
+	var wave := sin(_charge_phase)
+	var yaw := deg_to_rad(wave * alpha * tuning.charge_wiggle_max_deg)
+	var offset := Vector3(-wave * alpha * tuning.charge_tail_swing, 0.0, 0.0)
+	return {"yaw": yaw, "offset": offset}
 
 
 func _impact_envelope(delta: float) -> float:
@@ -225,19 +292,39 @@ func _impact_envelope(delta: float) -> float:
 	return Easing.pulse_back(t, tuning.impact_attack) * _impact_strength
 
 
+## The car swells on impact rather than shrinking. A hit that makes your car
+## smaller reads as your car losing; a sudden bulge reads as force delivered.
+## The bias keeps it from being a plain balloon: the axis that took the hit
+## grows least, the axis across it grows most, so the direction still reads.
 func _impact_scale(delta: float) -> Vector3:
-	var amount := _impact_envelope(delta) * tuning.impact_pulse_scale
+	var envelope := _impact_envelope(delta)
+	_drive_outline(envelope)
+	var amount := envelope * tuning.impact_inflate
 	if is_zero_approx(amount):
 		return Vector3.ZERO
 
-	# Squash along whichever local axis took the hit, bulge across the other.
 	var along_length := absf(_impact_local_dir.z)
 	var along_width := absf(_impact_local_dir.x)
+	var bias := tuning.impact_directional_bias
 	return Vector3(
-		-along_width * amount + along_length * amount * 0.5,
-		amount * 0.35,
-		-along_length * amount + along_width * amount * 0.5
+		amount * (1.0 - bias * along_width + bias * along_length),
+		amount * (1.0 + bias * 0.5),
+		amount * (1.0 - bias * along_length + bias * along_width)
 	)
+
+
+## Flashes the outline in step with the impact envelope.
+func _drive_outline(envelope: float) -> void:
+	if _outlines.is_empty():
+		return
+	var visible_now := envelope > 0.001
+	for i in _outlines.size():
+		_outlines[i].visible = visible_now
+		if visible_now:
+			_outline_materials[i].grow_amount = envelope * tuning.impact_outline_grow
+			var color := tuning.impact_outline_color
+			color.a = clampf(envelope, 0.0, 1.0)
+			_outline_materials[i].albedo_color = color
 
 
 func _impact_position() -> Vector3:

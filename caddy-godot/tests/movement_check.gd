@@ -129,6 +129,12 @@ func _run() -> void:
 		"_check_camera_framing",
 		"_check_easing",
 		"_check_feel",
+		"_check_charge_feel",
+		"_check_drift_trail",
+		"_check_shockwave_mesh",
+		"_check_hit_stop",
+		"_check_impact_fx",
+		"_check_tuning_panel",
 	]:
 		_log_progress("start %s" % check)
 		call(check)
@@ -876,15 +882,15 @@ func _check_match_scene_framing() -> void:
 		root.free()
 		return
 
-	_expect(rig.center_bias >= 0.999, "match camera is fully anchored to the arena")
+	_expect(rig.tuning.center_bias >= 0.999, "match camera is fully anchored to the arena")
 	_expect(
-		rig.base_pitch_deg <= -80.0,
-		"match camera is near top-down (%.0f deg)" % rig.base_pitch_deg
+		rig.tuning.base_pitch_deg <= -80.0,
+		"match camera is near top-down (%.0f deg)" % rig.tuning.base_pitch_deg
 	)
-	_expect(rig.fit_ground_radius > 0.0, "match camera uses fitted framing")
+	_expect(rig.tuning.fit_ground_radius > 0.0, "match camera uses fitted framing")
 
-	var height := rig._fitted_arm_length() * sin(deg_to_rad(absf(rig.base_pitch_deg)))
-	var half_view := height * tan(deg_to_rad(rig.base_fov * 0.5))
+	var height := rig._fitted_arm_length() * sin(deg_to_rad(absf(rig.tuning.base_pitch_deg)))
+	var half_view := height * tan(deg_to_rad(rig.tuning.base_fov * 0.5))
 	_expect(
 		half_view >= arena.radius,
 		"the whole arena fits in frame (%.1f m view vs %.1f m arena)"
@@ -900,11 +906,12 @@ func _check_camera_framing() -> void:
 	var camera := Camera3D.new()
 	camera.name = "Camera3D"
 	rig.add_child(camera)
-	rig.base_pitch_deg = -85.0
-	rig.base_fov = 90.0
-	rig.fit_ground_radius = 30.0
+	rig.tuning = CameraTuning.new()
+	rig.tuning.base_pitch_deg = -85.0
+	rig.tuning.base_fov = 90.0
+	rig.tuning.fit_ground_radius = 30.0
+	rig.tuning.center_bias = 1.0
 	rig.center_anchor = _arena
-	rig.center_bias = 1.0
 	add_child(rig)
 
 	# Arm length must put the requested ground radius inside the vertical FOV.
@@ -913,9 +920,9 @@ func _check_camera_framing() -> void:
 	var half_view := height * tan(deg_to_rad(45.0))
 	_record("fitted camera arm length", arm, "m", 30.0 / sin(deg_to_rad(85.0)), 0.01)
 	_expect(
-		half_view >= rig.fit_ground_radius - 0.01,
+		half_view >= rig.tuning.fit_ground_radius - 0.01,
 		"the fitted arm covers the requested ground radius (%.1f m vs %.1f m)"
-		% [half_view, rig.fit_ground_radius]
+		% [half_view, rig.tuning.fit_ground_radius]
 	)
 	_check_match_scene_framing()
 
@@ -931,14 +938,337 @@ func _check_camera_framing() -> void:
 	)
 
 	# And with the anchor off it goes back to following the car.
-	rig.center_bias = 0.0
+	rig.tuning.center_bias = 0.0
 	focus = rig._focus_point()
 	_expect(
 		focus.distance_to(_vehicle.global_position) < 0.01,
 		"center_bias 0 follows the car again"
 	)
 
+	# Shake: trauma accumulates, is squared on the way out, and decays to rest.
+	_expect(rig._shake_offset().is_zero_approx(), "no shake while trauma is zero")
+	rig.add_trauma(1.0)
+	_expect(is_equal_approx(rig.trauma, 1.0), "trauma accumulates up to 1")
+	rig._shake_time = 3.0
+	var full := rig._shake_offset().length()
+	rig.trauma = 0.5
+	var half := rig._shake_offset().length()
+	_expect(
+		full > 0.0 and half < full * 0.3,
+		"shake is squared, so half the trauma is far less than half the shake (%.3f vs %.3f)"
+		% [half, full]
+	)
+	rig.trauma = 1.0
+	var decay_ticks := 0
+	while rig.trauma > 0.0 and decay_ticks < 600:
+		rig._update_shake(TICK)
+		decay_ticks += 1
+	_record(
+		"trauma decay time", float(decay_ticks) * TICK, "s", 1.0 / rig.tuning.trauma_decay, 0.05
+	)
+
 	rig.queue_free()
+
+
+## Charging must visibly build: the wiggle speeds up and the deformation deepens
+## the closer the dash gets to firing.
+func _check_charge_feel() -> void:
+	var scene := load("res://scenes/vehicle.tscn") as PackedScene
+	var car := scene.instantiate() as ArcadeVehicle
+	add_child(car)
+	car.global_position = Vector3(0.0, 0.35, -4500.0)
+
+	var feel: VehicleFeel = null
+	var skill: BrakeDashSkill = null
+	for child in car.get_children():
+		if child is VehicleFeel:
+			feel = child
+		elif child is BrakeDashSkill:
+			skill = child
+	if feel == null or skill == null:
+		_expect(false, "vehicle scene exposes feel and skill for the charge check")
+		car.queue_free()
+		return
+
+	feel.tuning = feel.tuning.duplicate()
+	feel.tuning.enable_engine_vibration = false
+	feel.tuning.enable_acceleration_deform = false
+
+	# Not charging: no wiggle at all.
+	skill.state = BrakeDashSkill.State.READY
+	var idle: Dictionary = feel._charge_swing()
+	_expect(
+		is_zero_approx(idle["yaw"]) and idle["offset"].is_zero_approx(),
+		"no charge wiggle while the skill is idle"
+	)
+
+	# Early charge versus full charge: both the rate and the throw must grow.
+	skill.state = BrakeDashSkill.State.CHARGING
+	skill.current_charge_alpha = 0.1
+	feel._charge_phase = 0.0
+	feel._charge_anticipation(0.25)
+	var early_phase := feel._charge_phase
+
+	skill.current_charge_alpha = 1.0
+	feel._charge_phase = 0.0
+	feel._charge_anticipation(0.25)
+	var late_phase := feel._charge_phase
+	_expect(
+		late_phase > early_phase * 2.0,
+		"the wiggle speeds up as the charge fills (%.2f -> %.2f rad)" % [early_phase, late_phase]
+	)
+
+	# Peak swing magnitude across a full wiggle cycle, low charge vs full charge.
+	var early_swing := _peak_swing(feel, skill, 0.15)
+	var late_swing := _peak_swing(feel, skill, 1.0)
+	_expect(
+		late_swing > early_swing * 2.0,
+		"the tail swings wider as the charge fills (%.4f -> %.4f m)"
+		% [early_swing, late_swing]
+	)
+
+	# And the anticipation squash compresses the length axis.
+	skill.current_charge_alpha = 1.0
+	feel._charge_phase = 0.0
+	var squash: Vector3 = feel._charge_anticipation(0.0)
+	_expect(
+		squash.z < 0.0 and squash.x > 0.0,
+		"charging compresses the length and widens the body (%v)" % squash
+	)
+
+	car.queue_free()
+
+
+func _peak_swing(feel: VehicleFeel, skill: BrakeDashSkill, alpha: float) -> float:
+	skill.current_charge_alpha = alpha
+	feel._charge_phase = 0.0
+	var peak := 0.0
+	for i in 120:
+		feel._charge_anticipation(TICK)
+		peak = maxf(peak, absf(float(feel._charge_swing()["offset"].x)))
+	return peak
+
+
+## The skid ribbon only appears on a real slide, and dies out on its own.
+func _check_drift_trail() -> void:
+	var trail := DriftTrail.new()
+	trail.vehicle = _vehicle
+	trail.tuning = load("res://resources/tuning/drift_trail_default.tres")
+	_vehicle.add_child(trail)
+
+	_reset()
+	_expect(is_zero_approx(trail.slip_strength()), "a parked car lays no trail")
+
+	# Driving straight is not a slide, however fast.
+	_drive(3.0, 1.0, 0.0, Vector3.FORWARD)
+	_expect(
+		is_zero_approx(trail.slip_strength()),
+		"driving straight lays no trail (slip %.2f)" % absf(_vehicle.get_lateral_speed())
+	)
+
+	# Rotate the body off its velocity: now it is sliding sideways.
+	_vehicle.rotation.y = PI * 0.5
+	_expect(
+		trail.slip_strength() > 0.5,
+		"a hard slide lays a trail (strength %.2f)" % trail.slip_strength()
+	)
+
+	# Samples accumulate along the slide, then age out once it stops.
+	for i in 40:
+		_vehicle._physics_process(TICK)
+		trail._process(TICK)
+	var laid := trail._left.size()
+	_expect(laid > 0, "the slide laid down %d ribbon segments" % laid)
+
+	_reset()
+	for i in int(ceil(trail.tuning.lifetime / TICK)) + 10:
+		trail._process(TICK)
+	_expect(
+		trail._left.is_empty() and trail._right.is_empty(),
+		"ribbon segments age out after their lifetime"
+	)
+
+	trail.queue_free()
+
+
+func _check_shockwave_mesh() -> void:
+	var mesh := ImpactVfx.spiky_ring_mesh(12, 0.62, 1.0, 0.74)
+	_expect(mesh.get_surface_count() == 1, "the shockwave ring builds one surface")
+
+	var vertices: PackedVector3Array = mesh.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]
+	# 12 spikes -> 24 segments -> 2 triangles each -> 6 verts per segment.
+	_record("ring vertex count", float(vertices.size()), "", 24.0 * 6.0, 0.001)
+
+	var shortest := INF
+	var longest := 0.0
+	var flat := true
+	for vertex in vertices:
+		var radius := Vector2(vertex.x, vertex.z).length()
+		shortest = minf(shortest, radius)
+		longest = maxf(longest, radius)
+		if absf(vertex.y) > 0.0001:
+			flat = false
+	_expect(flat, "the ring is flat on the ground plane")
+	_expect(
+		longest > 0.99 and shortest < 0.63,
+		"the ring spans inner rim to spike tip (%.2f to %.2f)" % [shortest, longest]
+	)
+	# A plain torus would have a single outer radius; alternating radii is what
+	# makes the silhouette spiky rather than round.
+	var outer_radii := {}
+	for vertex in vertices:
+		var radius := Vector2(vertex.x, vertex.z).length()
+		if radius > 0.7:
+			outer_radii[snappedf(radius, 0.01)] = true
+	_expect(
+		outer_radii.size() >= 2,
+		"the outer edge alternates between spike and notch radii (%d distinct)"
+		% outer_radii.size()
+	)
+
+
+func _check_hit_stop() -> void:
+	HitStop.cancel()
+	_expect(not HitStop.is_active(), "hit stop starts idle")
+	_expect(is_equal_approx(Engine.time_scale, 1.0), "time scale starts at 1")
+
+	# Merging: the strongest freeze and the longest slow survive, so four cars
+	# colliding in one frame cannot cancel each other out.
+	HitStop.request(0.05, 0.1, 0.4)
+	HitStop.request(0.02, 0.3, 0.3)
+	_record("merged freeze", HitStop.freeze_remaining, "s", 0.05, 0.001)
+	_record("merged slow", HitStop.slow_remaining, "s", 0.3, 0.001)
+	_expect(
+		HitStop.slow_scale <= 0.3 + 0.001,
+		"the deepest requested slow scale wins (%.2f)" % HitStop.slow_scale
+	)
+	_expect(HitStop.is_active(), "hit stop reports active")
+
+	HitStop.cancel()
+	_expect(
+		not HitStop.is_active() and is_equal_approx(Engine.time_scale, 1.0),
+		"cancel restores full speed"
+	)
+
+
+## Exercises the real FX path end to end: a scored hit must freeze time, shake
+## the shot and spawn visuals. Headless has no renderer, but the nodes and their
+## tweens are still built, so this catches construction errors.
+func _check_impact_fx() -> void:
+	HitStop.cancel()
+
+	var rig := VehicleCameraRig.new()
+	var camera := Camera3D.new()
+	camera.name = "Camera3D"
+	rig.add_child(camera)
+	rig.tuning = CameraTuning.new()
+	add_child(rig)
+
+	var adjudicator := ImpactAdjudicator.new()
+	adjudicator.vehicle = _vehicle
+	adjudicator.tuning = load("res://resources/tuning/impact_default.tres")
+	_vehicle.add_child(adjudicator)
+
+	var fx := ImpactFx.new()
+	fx.vehicle = _vehicle
+	fx.adjudicator = adjudicator
+	fx.tuning = load("res://resources/tuning/impact_fx_default.tres").duplicate()
+	_vehicle.add_child(fx)
+
+	var before := get_child_count()
+	var impact := ImpactEvent.new()
+	impact.attacker = _vehicle
+	impact.target = _target
+	impact.tier = ImpactTier.Value.HEAVY
+	impact.position = Vector3(0.0, 0.35, -100.0)
+	adjudicator.impact_dealt.emit(impact)
+
+	_record("heavy hit freeze", HitStop.freeze_remaining, "s", fx.tuning.heavy_freeze, 0.001)
+	_record("heavy hit slow", HitStop.slow_remaining, "s", fx.tuning.heavy_slow, 0.001)
+	_expect(
+		is_equal_approx(rig.trauma, fx.tuning.heavy_trauma),
+		"a heavy hit shakes the camera (trauma %.2f)" % rig.trauma
+	)
+	_expect(
+		get_child_count() > before,
+		"a heavy hit spawns visual effects (%d new nodes)" % (get_child_count() - before)
+	)
+
+	# A wall scrape must shake a little but never freeze the match.
+	HitStop.cancel()
+	rig.trauma = 0.0
+	var wall_hit := VehicleCollisionEvent.new()
+	wall_hit.target_is_vehicle = false
+	wall_hit.normal_impact_speed = 12.0
+	wall_hit.position = Vector3(0.0, 0.35, -100.0)
+	_vehicle.blocking_collision.emit(wall_hit)
+	_expect(not HitStop.is_active(), "a wall scrape never freezes time")
+	_expect(rig.trauma > 0.0, "a wall scrape still shakes a little (%.2f)" % rig.trauma)
+	_expect(
+		rig.trauma < fx.tuning.heavy_trauma,
+		"a wall scrape shakes less than a scored hit"
+	)
+
+	HitStop.cancel()
+	fx.queue_free()
+	adjudicator.queue_free()
+	rig.queue_free()
+
+
+func _check_tuning_panel() -> void:
+	# Never point the panel at the shipping resource: a stray save would rewrite
+	# the real tuning file.
+	var tuning: VehicleTuning = load("res://resources/tuning/tuning_default.tres").duplicate()
+	var panel := TuningPanel.new()
+	add_child(panel)
+	panel.setup(tuning, "Test")
+
+	_expect(panel.dirty_count() == 0, "a freshly built panel has nothing dirty")
+	_expect(
+		panel._labels.has("max_forward_speed") and panel._labels.has("drift_lateral_friction"),
+		"the panel reflects exported properties into rows"
+	)
+	_expect(
+		panel._labels.has("collision_response_mode"),
+		"enum properties get a row too"
+	)
+
+	# Editing writes straight through to the resource and marks the row dirty.
+	panel._on_edited("max_forward_speed", 30.0)
+	_expect(
+		is_equal_approx(tuning.max_forward_speed, 30.0),
+		"editing applies to the resource immediately"
+	)
+	_expect(panel.dirty_count() == 1, "the edited property is marked dirty")
+	var label: RichTextLabel = panel._labels["max_forward_speed"]
+	_expect(
+		label.text.contains("[b]") and label.text.contains(TuningPanel.DIRTY_COLOR.to_html(false)),
+		"a dirty row is bold and recoloured"
+	)
+	_expect(
+		panel.describe_changes().contains("max_forward_speed"),
+		"the confirm summary names the changed property"
+	)
+
+	# Setting it back by hand clears the dirty mark rather than leaving it stuck.
+	panel._on_edited("max_forward_speed", 22.0)
+	_expect(
+		panel.dirty_count() == 0,
+		"returning a value to its baseline clears the dirty mark"
+	)
+
+	panel._on_edited("max_forward_speed", 40.0)
+	panel._on_edited("linear_drag", 0.9)
+	_expect(panel.dirty_count() == 2, "multiple edits accumulate")
+	panel.revert()
+	_expect(
+		panel.dirty_count() == 0
+		and is_equal_approx(tuning.max_forward_speed, 22.0)
+		and is_equal_approx(tuning.linear_drag, 0.3),
+		"revert restores every edited value"
+	)
+
+	panel.queue_free()
 
 
 # ---------------------------------------------------------------------------
@@ -1081,6 +1411,32 @@ func _check_feel() -> void:
 		dash_scale.z > 0.0 and dash_scale.x < 0.0,
 		"the dash stretches length and squashes width (%v)" % dash_scale
 	)
+
+	# The point of the rework: a hit must make the car BIGGER. Shrinking read as
+	# the car losing rather than as it landing a hit.
+	feel._impact_elapsed = -1.0
+	feel._dash_elapsed = -1.0
+	feel.play_impact(12.0, Vector3.BACK)
+	var peak := Vector3.ONE
+	for i in 12:
+		feel._process(TICK)
+		if visual.scale.length() > peak.length():
+			peak = visual.scale
+	_expect(
+		peak.x > 1.0 and peak.y > 1.0 and peak.z > 1.0,
+		"an impact grows the car on every axis (%v)" % peak
+	)
+	_record("impact peak swell", peak.length() / Vector3.ONE.length(), "x", 1.35, 0.25)
+
+	# The outline shell has to exist, flash, and then go away again.
+	_expect(not feel._outlines.is_empty(), "impact outline meshes were built")
+	_expect(
+		feel._outlines[0].visible and feel._outline_materials[0].grow_amount > 0.0,
+		"the outline is showing while the impact plays"
+	)
+	for i in int(ceil(feel.tuning.impact_pulse_duration / TICK)) + 30:
+		feel._process(TICK)
+	_expect(not feel._outlines[0].visible, "the outline hides once the impact ends")
 
 	# Engine idle: a continuous wobble that stays inside its configured ceiling.
 	feel.tuning.enable_engine_vibration = true
