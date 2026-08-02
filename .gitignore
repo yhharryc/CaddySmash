@@ -1,6 +1,14 @@
 # Visual Studio 2015 user specific files
 .vs/
 
+# JetBrains Rider. Everything here is per-developer state (window layout,
+# local run configs, indexing); nothing in it is worth sharing.
+.idea/
+
+# Claude Code. Only the personal override is ignored - a project-level
+# .claude/settings.json, CLAUDE.md or shared agents/skills should be committed.
+.claude/settings.local.json
+
 # Compiled Object files
 *.slo
 *.lo
@@ -73,3 +81,38 @@ Plugins/**/Intermediate/*
 
 # Cache files for the editor to use
 DerivedDataCache/*
+
+# ---------------------------------------------------------------------------
+# Godot 4 port (caddy-godot/)
+# ---------------------------------------------------------------------------
+
+# Editor cache: imported assets, shader cache, the global class registry.
+# Fully regenerable with:
+#   godot --headless --editor --quit --path caddy-godot
+# Note the flip side: if this is missing, a headless run hangs silently at idle
+# memory instead of erroring, because class_name types cannot resolve.
+caddy-godot/.godot/
+
+# Export output and presets. export_presets.cfg can hold keystore paths and
+# passwords, so it stays out of the repo.
+caddy-godot/export_presets.cfg
+caddy-godot/export.cfg
+caddy-godot/build/
+caddy-godot/exports/
+
+# Android build template, only present if one is installed.
+caddy-godot/android/
+
+# Generated from CSV translation sources.
+caddy-godot/*.translation
+
+# C#/Mono leftovers, harmless if the project stays pure GDScript.
+caddy-godot/.mono/
+caddy-godot/data_*/
+caddy-godot/mono_crash.*.json
+
+# Deliberately NOT ignored:
+#   *.uid       - stable resource ids Godot 4.4+ writes next to each script.
+#                 Dropping them makes references break on other machines.
+#   *.import    - import settings for committed assets (icon.svg.import).
+#   .editorconfig, project.godot, resources/, scenes/, scripts/, tests/

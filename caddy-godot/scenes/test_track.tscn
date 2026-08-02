@@ -1,0 +1,89 @@
+[gd_scene load_steps=11 format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/vehicle.tscn" id="1_vehicle"]
+[ext_resource type="Script" path="res://scripts/debug/test_arena.gd" id="2_arena"]
+[ext_resource type="Script" path="res://scripts/camera/vehicle_camera_rig.gd" id="3_camera"]
+[ext_resource type="Script" path="res://scripts/debug/vehicle_debug_draw.gd" id="4_debug_draw"]
+[ext_resource type="Script" path="res://scripts/debug/vehicle_debug_hud.gd" id="5_debug_hud"]
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_ground"]
+size = Vector2(200, 200)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ground"]
+albedo_color = Color(0.16, 0.17, 0.19, 1)
+
+[sub_resource type="Environment" id="Environment_main"]
+background_mode = 1
+background_color = Color(0.08, 0.09, 0.11, 1)
+ambient_light_source = 2
+ambient_light_color = Color(0.5, 0.55, 0.65, 1)
+ambient_light_energy = 0.6
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_target"]
+albedo_color = Color(0.85, 0.3, 0.35, 1)
+
+[sub_resource type="LabelSettings" id="LabelSettings_hud"]
+font_size = 14
+font_color = Color(0.85, 0.92, 1, 1)
+
+[node name="TestTrack" type="Node3D"]
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_main")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+transform = Transform3D(0.86, -0.35, 0.37, 0, 0.73, 0.68, -0.51, -0.59, 0.63, 0, 20, 0)
+shadow_enabled = true
+
+[node name="Ground" type="MeshInstance3D" parent="."]
+mesh = SubResource("PlaneMesh_ground")
+surface_material_override/0 = SubResource("StandardMaterial3D_ground")
+
+[node name="Arena" type="Node3D" parent="."]
+script = ExtResource("2_arena")
+
+[node name="Vehicle" parent="." instance=ExtResource("1_vehicle") node_paths=PackedStringArray("intent_yaw_source")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.35, 0)
+intent_yaw_source = NodePath("../CameraRig")
+
+[node name="TargetVehicle" parent="." instance=ExtResource("1_vehicle")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.35, -18)
+
+[node name="Body" parent="TargetVehicle/Visual"]
+surface_material_override/0 = SubResource("StandardMaterial3D_target")
+
+[node name="Driver" parent="TargetVehicle"]
+enabled = false
+
+[node name="CameraRig" type="Node3D" parent="." node_paths=PackedStringArray("vehicle")]
+script = ExtResource("3_camera")
+vehicle = NodePath("../Vehicle")
+
+[node name="Camera3D" type="Camera3D" parent="CameraRig"]
+transform = Transform3D(1, 0, 0, 0, 0.309, 0.951, 0, -0.951, 0.309, 0, 13.31, 4.33)
+fov = 90.0
+
+[node name="DebugDraw" type="MeshInstance3D" parent="." node_paths=PackedStringArray("vehicle")]
+script = ExtResource("4_debug_draw")
+vehicle = NodePath("../Vehicle")
+
+[node name="DebugHUD" type="CanvasLayer" parent="." node_paths=PackedStringArray("vehicle", "camera_rig", "skill", "combat", "target_combat")]
+script = ExtResource("5_debug_hud")
+vehicle = NodePath("../Vehicle")
+camera_rig = NodePath("../CameraRig")
+skill = NodePath("../Vehicle/Skill")
+combat = NodePath("../Vehicle/Combat")
+target_combat = NodePath("../TargetVehicle/Combat")
+
+[node name="Panel" type="Panel" parent="DebugHUD"]
+offset_left = 12.0
+offset_top = 12.0
+offset_right = 340.0
+offset_bottom = 520.0
+
+[node name="Label" type="Label" parent="DebugHUD/Panel"]
+offset_left = 12.0
+offset_top = 10.0
+offset_right = 316.0
+offset_bottom = 500.0
+label_settings = SubResource("LabelSettings_hud")

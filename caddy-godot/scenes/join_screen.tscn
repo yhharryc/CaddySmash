@@ -1,0 +1,51 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/join_screen.gd" id="1_join"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_bg"]
+bg_color = Color(0.07, 0.08, 0.1, 1)
+
+[node name="JoinScreen" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_join")
+
+[node name="Background" type="Panel" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_bg")
+
+[node name="Root" type="VBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 28
+alignment = 1
+
+[node name="Title" type="Label" parent="Root"]
+layout_mode = 2
+text = "CADDY SMASH"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 56
+
+[node name="Slots" type="HBoxContainer" parent="Root"]
+layout_mode = 2
+theme_override_constants/separation = 18
+alignment = 1
+
+[node name="Hint" type="Label" parent="Root"]
+layout_mode = 2
+text = "Press A on a controller, or Enter on the keyboard, to join"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 18

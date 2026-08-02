@@ -1,0 +1,26 @@
+[gd_resource type="Resource" script_class="CombatTuning" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/combat/combat_tuning.gd" id="1_combat"]
+
+[resource]
+script = ExtResource("1_combat")
+max_health = 1000.0
+knockback_resistance = 0.0
+light_knockback_speed = 6.2
+light_knockback_duration = 0.12
+light_knockback_carry = 0.12
+medium_knockback_speed = 9.5
+medium_knockback_duration = 0.16
+medium_knockback_carry = 0.16
+heavy_knockback_speed = 13.2
+heavy_knockback_duration = 0.22
+heavy_knockback_carry = 0.2
+light_stagger_duration = 0.35
+light_stagger_spins = 1
+light_stagger_input_lock = 0.35
+medium_stagger_duration = 0.55
+medium_stagger_spins = 2
+medium_stagger_input_lock = 0.55
+heavy_stagger_duration = 0.8
+heavy_stagger_spins = 3
+heavy_stagger_input_lock = 0.8

@@ -1,0 +1,28 @@
+[gd_resource type="Resource" script_class="SkillTuning" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/vehicle/skill_tuning.gd" id="1_skill"]
+
+[resource]
+script = ExtResource("1_skill")
+enable_brake_dash = true
+trigger_mode = 0
+trigger_throttle_threshold = 0.85
+trigger_brake_threshold = 0.85
+trigger_input_hold_seconds = 0.02
+cooldown_seconds = 2.0
+brake_duration = 0.34
+max_charge_seconds = 1.0
+min_charge_seconds = 0.0
+aim_input_dead_zone = 0.1
+rotate_to_aim_during_charge = true
+aim_rotation_rate_deg = 900.0
+dash_duration_at_min_charge = 0.22
+dash_duration_at_max_charge = 0.42
+dash_peak_speed_at_min_charge = 26.0
+dash_peak_speed_at_max_charge = 42.0
+post_dash_carry_ratio = 0.3
+enable_targeting = false
+aim_selection_mode = 2
+trace_distance = 18.0
+trace_radius = 1.2
+trace_mask = 1

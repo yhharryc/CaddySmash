@@ -1,0 +1,215 @@
+# CaddySmash — Unreal → Godot port
+
+Source of truth for the original behaviour is `../Source/CaddySmash/`.
+
+## Run
+
+- Play: main scene is `scenes/test_track.tscn`.
+- Verify physics headlessly:
+
+```bash
+godot --headless --path caddy-godot res://tests/movement_check.tscn
+```
+
+`movement_check` asserts the ported car reproduces the Unreal tuning: top speed,
+0→20 time, drift/grip steering rates, lateral friction retention, reverse
+steering hysteresis, control lock, arcade wall glide, every brake-dash phase
+transition, impact tiers and damage, and the knockback/stagger reactions. It
+exits non-zero on failure. Pass `-- --verbose-checks` to log each check to
+`user://check_progress.log` as it starts, which is how you locate a hang —
+Godot's stdout is block-buffered when piped, so `print` shows nothing until exit.
+
+**If a headless run hangs at idle memory with no output, the `.godot` cache is
+missing or broken.** Without it `class_name` types do not resolve, and the
+runtime sits in its main loop forever instead of reporting anything. Rebuild it:
+
+```bash
+godot --headless --editor --quit --path caddy-godot
+```
+
+## Controls
+
+The game boots into the join screen (`scenes/join_screen.tscn`). Up to four
+players claim a seat, one per device, then any of them starts the match.
+
+| | Keyboard | Gamepad |
+|---|---|---|
+| Join / leave a seat | Enter / Esc | A / B |
+| Start the match | Space | START |
+| Move intent (aim) | WASD | Left stick |
+| Accelerate | Shift | RT, A |
+| Brake / reverse | Q | LT, B |
+| Brake-dash (hold to charge, release to fire) | Space | X |
+| Grip (tuning aid) | Ctrl | LB |
+| Debug HUD (`test_track` only) | F1 | |
+| Respawn all cars | R | |
+
+## Local multiplayer
+
+`scripts/input/input_device.gd` polls one keyboard or one gamepad **directly** —
+`Input.get_joy_axis(device_id, ...)`, `Input.is_physical_key_pressed(...)`.
+
+This replaced the InputMap for gameplay, and it had to. InputMap actions
+aggregate every connected device: `Input.get_action_strength("caddy_accelerate")`
+is true when *any* pad pulls a trigger, so there is no way to ask what player 2
+is doing. The InputMap now only carries `caddy_debug_toggle` and `caddy_reset`,
+where aggregation is the behaviour you want.
+
+The join screen writes to the `PlayerRoster` autoload, which survives the scene
+change into `scenes/arena_match.tscn`. `MatchManager` reads the roster, spawns a
+car per seat at the arena's spawn ring, assigns each driver its device, and tints
+the body with the seat colour. Running `arena_match.tscn` directly still works:
+an empty roster falls back to a single keyboard player.
+
+**One shared camera, not split screen**, and in the match it is fixed rather than
+chasing: `center_bias = 1` locks the shot to the arena centre, `base_pitch_deg =
+-85` makes it near top-down, and `fit_ground_radius` solves the arm length so the
+whole arena sits in the vertical FOV. In that mode the speed and spread offsets
+and the look-ahead are all suppressed on purpose — every one of them makes the
+frame breathe, which is the opposite of a steady shot.
+
+Because the framing is solved from `fit_ground_radius`, **how big the cars look
+is set by the arena size**. Shrink `Arena.radius` and drop `fit_ground_radius` to
+match (keep it ~15% larger so the wall stays visible) to get closer still.
+
+The rig still supports the chase behaviour: with `center_bias = 0` and
+`fit_ground_radius = 0` it is the original single-player camera, look-ahead and
+lateral roll included, which is what `test_track.tscn` uses.
+
+Keyboard accelerate is **Shift only**: the dash took Space, and the two cannot
+share a key.
+
+## Feel layer
+
+`scripts/vehicle/vehicle_feel.gd` is the port of `UCaddyVehicleFeelComponent`.
+Everything it does is applied to the `Visual` node inside `vehicle.tscn`, which
+holds the meshes — the collision body and all the physics above it are never
+touched. A harness check asserts exactly that.
+
+Two continuous layers ease toward a target every frame (acceleration
+squash/stretch, lateral lean, engine idle wobble). Two one-shot layers run an
+eased envelope and add on top:
+
+- **Dash** — anticipation squash that builds with charge alpha, then a stretch
+  along the length axis on release, scaled by how long it was held.
+- **Impact** — squash along whichever local axis took the hit, bulging across it,
+  plus a position and rotation kick. The hit direction is stored in *local* space
+  so the squash follows the body as it spins out.
+
+**Nothing is linear.** `scripts/util/easing.gd` holds the curves, and the harness
+verifies each one departs from the straight line between its endpoints, that the
+pulse envelopes start and end at rest, and that `out_back`/`pulse_back` overshoot
+— that overshoot is what gives a hit its snap. Every effect also takes an
+optional `Curve` override in `FeelTuning`, mirroring how UE exposed `UCurveFloat`
+with an analytic fallback.
+
+## Arena
+
+`scripts/arena/circular_arena.gd` builds the round arena in code: a ring of flat
+box segments (64 by default), pillars, and a disc floor. Godot has no inside-out
+primitive and a concave trimesh is fragile against `CharacterBody3D` sweeps, so
+the wall is a polygon. That also suits the arcade glide, which works off one
+surface normal per contact — at 64 segments the normal turns 5.6° per joint.
+
+## Ported so far
+
+| Godot | Unreal |
+|---|---|
+| `scripts/vehicle/arcade_vehicle.gd` | `UArcadeVehicleMovementComponent` — gas, handling, drift, reverse steering, arcade wall glide |
+| `scripts/vehicle/vehicle_tuning.gd` | `UCaddyVehicleTuningDataAsset` — Gas, Handling, Collision configs |
+| `scripts/vehicle/brake_dash_skill.gd` | `UCaddyVehicleSkillComponent` + `UCaddyVehicleBrakeDashAbility` |
+| `scripts/vehicle/skill_tuning.gd` | `FCaddyVehicleBrakeDashSkillConfig` |
+| `scripts/vehicle/vehicle_collision_event.gd` | the `Attr.Collision.*` HitRegister attribute payload |
+| `scripts/combat/impact_adjudicator.gd` | `UHRN_AdjudicateVehicleCollision` + `UHRN_EmitVehicleCollisionGameplayEvents` |
+| `scripts/combat/impact_tuning.gd` | those two nodes' config, plus the gates from `FCaddyVehicleCollisionHitRegisterConfig` |
+| `scripts/combat/vehicle_combat.gd` | `UCaddyVehicleAttributeSet`, the damageable component, `UCaddyVehicleKnockbackAbility`, `UCaddyVehicleStaggerAbility` |
+| `scripts/combat/combat_tuning.gd` | attribute defaults plus both abilities' tier tables |
+| `scripts/combat/impact_tier.gd` | `EHRVehicleCollisionImpactTier` |
+| `scripts/vehicle/player_vehicle_driver.gd` | `ACaddyVehiclePawn` input half |
+| `scripts/camera/vehicle_camera_rig.gd` | `UCaddyVehicleCameraComponent` + SpringArm rig |
+| `scripts/util/ue_math.gd` | `FMath::FInterpTo` / `VInterpTo` / `FInterpConstantTo` / `InterpEaseInOut` |
+
+## Not ported yet
+
+- The HitRegister pipeline itself. Unreal's node graph, gameplay tags and
+  attribute maps are replaced by direct calls: attacker's `ImpactAdjudicator`
+  scores the hit, then calls `receive_impact` on the target's `VehicleCombat`.
+  Same attacker → target flow, no tag plumbing.
+- GAS. No ability system, no gameplay effects, no attribute replication.
+- Feel layer (`UCaddyVehicleFeelComponent`): engine vibration, squash/stretch,
+  lean, impact pulse, hit stop.
+- Networking. The Unreal build is server-authoritative with client input RPCs;
+  nothing here is replicated.
+
+## Conversions applied
+
+- **Units**: Unreal cm → Godot m (÷100). Interp speeds and angles are unitless
+  and carry over unchanged. Every value in `vehicle_tuning.gd` notes its UE default.
+- **Axes**: UE is left-handed, +X forward / +Y right / +Z up. Godot is
+  right-handed, −Z forward / +X right / +Y up. `UeMath.heading_to_yaw` and
+  `yaw_to_heading` are the only places that convert between a planar direction
+  and a yaw — go through them.
+- **Interpolation**: Godot's `lerp` is not Unreal's `FInterpTo`. Use `UeMath`,
+  or the ported tuning numbers stop meaning what they meant.
+
+## Deliberate differences from the Unreal build
+
+- **Drift is the resting state, expressed directly.** Unreal reached this via
+  `bInvertDriftInput = true` computing `Effective = 1 - Raw`, so an unheld button
+  meant "drifting". That inversion is gone; the input channel is now `grip_input`
+  where 0 is the car's default loose state. The button is a tuning aid for A/B-ing
+  the two friction values and is earmarked for another mechanic.
+- **`move_intent_dead_zone` is applied to the raw stick**, before normalising.
+  In Unreal `ComputeWorldMoveIntent` normalised first, so `SetMoveIntent`'s dead
+  zone test could never fire for a player and Enhanced Input's own dead zone did
+  the work. Godot's InputMap has a per-action dead zone too (0.2), so the
+  structure matches; the field is just no longer dead.
+- **Camera yaw is world-fixed at 0**, matching the Unreal boom's
+  `SetUsingAbsoluteRotation(true)`. This is load-bearing: move intent is
+  camera-relative, so rotating `CameraRig` rotates the control scheme.
+- **One brake-dash state machine, not two.** Unreal ran the same Ready → Braking
+  → Charging → Dashing logic in both `UCaddyVehicleSkillComponent::TickComponent`
+  and `UCaddyVehicleBrakeDashAbility` on a 120 Hz GAS timer, selected by
+  `bUseGASAbilityStateMachine`. There is one copy here, ticked at the physics rate.
+- **Skill target lock uses a `ShapeCast3D` plus a group name** in place of GAS
+  target actors and `UHitRegisterTargetingProfile`. Same sweep shape and nearest-
+  candidate selection; off by default, as in the Unreal config.
+
+- **Knockback cancels an active brake-dash.** Unreal let the dash ability and the
+  knockback ability both hold `SetExternalVelocityControlEnabled(true)`, so
+  whichever finished first handed control back while the other was still running.
+  `VehicleCombat` aborts the skill first, keeping one owner of velocity at a time.
+- **Damage is a plain clamped subtraction.** Unreal routed it through an
+  `IncomingDamage` meta attribute and `PostGameplayEffectExecute`; without GAS
+  that indirection buys nothing.
+
+## Implementation notes
+
+- `_perform_movement` uses `move_and_collide` in an explicit iteration loop, not
+  `move_and_slide`. `move_and_slide` runs its own slide resolution and rewrites
+  velocity, which would fight the arcade glide response.
+- Physics tick order is set by `process_physics_priority`: input driver `-10`,
+  skill `-5`, combat `-4`, vehicle `0`. So each frame runs input → skill override
+  → knockback override → movement. Reordering these desyncs effects by a frame.
+- **Hand-written `.tscn` files must declare node exports in the node header.**
+  An `@export var foo: SomeNode` assigned as `foo = NodePath("../Bar")` resolves
+  to **null** unless the header also lists it:
+
+  ```
+  [node name="Thing" type="Node" parent="." node_paths=PackedStringArray("foo")]
+  foo = NodePath("../Bar")
+  ```
+
+  The editor writes this automatically; authoring scenes by hand does not. It
+  fails silently — every such export was null for a while here, and the scripts
+  limped along on their `get_parent()` fallbacks in `_ready`, so nothing errored.
+  Resource exports (`ExtResource`) are unaffected.
+- **`_ready` is too early to touch sibling nodes.** While it runs the rest of the
+  scene is still being built: `add_child` on a sibling fails with "parent node is
+  busy setting up children", and node exports have not resolved. `MatchManager`
+  defers its spawn with `call_deferred` for exactly this.
+- **Keep shared types leaf-level.** GDScript handles cyclic `class_name`
+  dependencies badly: two classes referencing each other made the resolver spin
+  and eat memory rather than report an error. `ImpactTier` exists as its own
+  script for exactly this reason — do not fold the enum back into
+  `ImpactAdjudicator`.

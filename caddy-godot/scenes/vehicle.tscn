@@ -1,0 +1,76 @@
+[gd_scene load_steps=16 format=3]
+
+[ext_resource type="Script" path="res://scripts/vehicle/arcade_vehicle.gd" id="1_vehicle"]
+[ext_resource type="Resource" path="res://resources/tuning/tuning_default.tres" id="2_tuning"]
+[ext_resource type="Script" path="res://scripts/vehicle/player_vehicle_driver.gd" id="3_driver"]
+[ext_resource type="Script" path="res://scripts/vehicle/brake_dash_skill.gd" id="4_skill"]
+[ext_resource type="Resource" path="res://resources/tuning/skill_default.tres" id="5_skill_tuning"]
+[ext_resource type="Script" path="res://scripts/combat/impact_adjudicator.gd" id="6_adjudicator"]
+[ext_resource type="Resource" path="res://resources/tuning/impact_default.tres" id="7_impact_tuning"]
+[ext_resource type="Script" path="res://scripts/combat/vehicle_combat.gd" id="8_combat"]
+[ext_resource type="Resource" path="res://resources/tuning/combat_default.tres" id="9_combat_tuning"]
+[ext_resource type="Script" path="res://scripts/vehicle/vehicle_feel.gd" id="10_feel"]
+[ext_resource type="Resource" path="res://resources/tuning/feel_default.tres" id="11_feel_tuning"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_body"]
+size = Vector3(1.12, 0.7, 1.84)
+
+[sub_resource type="BoxMesh" id="BoxMesh_body"]
+size = Vector3(1.12, 0.7, 1.84)
+
+[sub_resource type="BoxMesh" id="BoxMesh_nose"]
+size = Vector3(0.5, 0.3, 0.3)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_body"]
+albedo_color = Color(0.2, 0.55, 0.9, 1)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_nose"]
+albedo_color = Color(1, 0.85, 0.2, 1)
+
+[node name="Vehicle" type="CharacterBody3D"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.35, 0)
+motion_mode = 1
+script = ExtResource("1_vehicle")
+tuning = ExtResource("2_tuning")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+shape = SubResource("BoxShape3D_body")
+
+[node name="Visual" type="Node3D" parent="."]
+
+[node name="Body" type="MeshInstance3D" parent="Visual"]
+mesh = SubResource("BoxMesh_body")
+surface_material_override/0 = SubResource("StandardMaterial3D_body")
+
+[node name="Nose" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.2, -0.92)
+mesh = SubResource("BoxMesh_nose")
+surface_material_override/0 = SubResource("StandardMaterial3D_nose")
+
+[node name="Skill" type="Node" parent="." node_paths=PackedStringArray("vehicle")]
+script = ExtResource("4_skill")
+vehicle = NodePath("..")
+tuning = ExtResource("5_skill_tuning")
+
+[node name="Combat" type="Node" parent="." node_paths=PackedStringArray("vehicle", "skill")]
+script = ExtResource("8_combat")
+vehicle = NodePath("..")
+tuning = ExtResource("9_combat_tuning")
+skill = NodePath("../Skill")
+
+[node name="Adjudicator" type="Node" parent="." node_paths=PackedStringArray("vehicle")]
+script = ExtResource("6_adjudicator")
+vehicle = NodePath("..")
+tuning = ExtResource("7_impact_tuning")
+
+[node name="Feel" type="Node" parent="." node_paths=PackedStringArray("vehicle", "visual_root", "skill")]
+script = ExtResource("10_feel")
+vehicle = NodePath("..")
+visual_root = NodePath("../Visual")
+tuning = ExtResource("11_feel_tuning")
+skill = NodePath("../Skill")
+
+[node name="Driver" type="Node" parent="." node_paths=PackedStringArray("vehicle", "skill")]
+script = ExtResource("3_driver")
+vehicle = NodePath("..")
+skill = NodePath("../Skill")
