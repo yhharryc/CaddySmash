@@ -88,30 +88,40 @@ DerivedDataCache/*
 # Godot 4 port (caddy-godot/)
 # ---------------------------------------------------------------------------
 
+# This file ignores everything by default (the `*` at the top) and allowlists
+# the Unreal directories back in. The Godot project is not one of those, so it
+# has to be allowlisted explicitly or every new file in it is silently dropped:
+# `git status` stays clean and nothing warns you, while the scenes that DO get
+# committed end up referencing scripts that never left this machine.
+!/caddy-godot/**
+
+# Everything below re-ignores the parts that must not be committed. Order
+# matters: these have to come after the allowlist above to take effect.
+
 # Editor cache: imported assets, shader cache, the global class registry.
 # Fully regenerable with:
 #   godot --headless --editor --quit --path caddy-godot
 # Note the flip side: if this is missing, a headless run hangs silently at idle
 # memory instead of erroring, because class_name types cannot resolve.
-caddy-godot/.godot/
+/caddy-godot/.godot/
 
 # Export output and presets. export_presets.cfg can hold keystore paths and
 # passwords, so it stays out of the repo.
-caddy-godot/export_presets.cfg
-caddy-godot/export.cfg
-caddy-godot/build/
-caddy-godot/exports/
+/caddy-godot/export_presets.cfg
+/caddy-godot/export.cfg
+/caddy-godot/build/
+/caddy-godot/exports/
 
 # Android build template, only present if one is installed.
-caddy-godot/android/
+/caddy-godot/android/
 
 # Generated from CSV translation sources.
-caddy-godot/*.translation
+/caddy-godot/*.translation
 
 # C#/Mono leftovers, harmless if the project stays pure GDScript.
-caddy-godot/.mono/
-caddy-godot/data_*/
-caddy-godot/mono_crash.*.json
+/caddy-godot/.mono/
+/caddy-godot/data_*/
+/caddy-godot/mono_crash.*.json
 
 # Deliberately NOT ignored:
 #   *.uid       - stable resource ids Godot 4.4+ writes next to each script.

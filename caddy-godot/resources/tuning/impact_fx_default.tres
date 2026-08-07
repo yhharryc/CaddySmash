@@ -1,0 +1,23 @@
+[gd_resource type="Resource" script_class="ImpactFxTuning" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/fx/impact_fx_tuning.gd" id="1_fx"]
+
+[resource]
+script = ExtResource("1_fx")
+enable_hit_stop = true
+enable_screen_shake = true
+enable_vfx = true
+light_freeze = 0.03
+medium_freeze = 0.06
+heavy_freeze = 0.11
+light_slow = 0.0
+medium_slow = 0.14
+heavy_slow = 0.3
+slow_scale = 0.32
+light_trauma = 0.28
+medium_trauma = 0.55
+heavy_trauma = 0.9
+wall_trauma_scale = 0.35
+spark_color = Color(1, 0.85, 0.45, 1)
+shockwave_color = Color(1, 0.6, 0.3, 1)
+wall_sparks = true

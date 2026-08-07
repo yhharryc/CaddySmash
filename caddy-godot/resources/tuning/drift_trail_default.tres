@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="DriftTrailTuning" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/fx/drift_trail_tuning.gd" id="1_trail"]
+
+[resource]
+script = ExtResource("1_trail")
+enabled = true
+slip_threshold = 2.5
+slip_for_full_effect = 9.0
+min_speed = 3.0
+wheel_offset = Vector3(0.46, -0.3, 0.72)
+ribbon_width = 0.24
+lifetime = 0.85
+sample_distance = 0.22
+max_segments = 48
+tint = Color(1, 0.75, 0.35, 1)
+additive = true
+ground_offset = 0.03
