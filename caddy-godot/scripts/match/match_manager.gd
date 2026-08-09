@@ -78,10 +78,13 @@ func _tint(vehicle: ArcadeVehicle, color: Color) -> void:
 		material.albedo_color = color
 		body.set_surface_override_material(0, material)
 
-	# Skid ribbons take the player colour too, so a trail identifies its owner.
+	# Skid ribbons and won-contest shockwaves take the player colour too, so both
+	# identify their owner at a glance.
 	for child in vehicle.get_children():
 		if child is DriftTrail:
 			(child as DriftTrail).color = color
+		elif child is ImpactFx:
+			(child as ImpactFx).color = color
 
 
 func _on_player_destroyed(slot: PlayerSlot) -> void:

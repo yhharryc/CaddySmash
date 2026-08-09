@@ -42,6 +42,10 @@ extends Resource
 ## Grip input above this value pulls the car out of its default drifty state.
 ## Equivalent to UE's DriftInputThreshold 0.15 seen through bInvertDriftInput.
 @export var grip_input_threshold: float = 0.85
+## Lateral slip, in m/s, before a collision counts as a drift hit for combat
+## scoring. The is_drifting flag cannot serve here: it is true by default, so it
+## would hand out the drift bonus on every hit ever landed.
+@export var slip_for_drift_bonus: float = 5.0
 
 @export_group("Reverse")
 ## UE bEnableInputRelativeReverseSteering.

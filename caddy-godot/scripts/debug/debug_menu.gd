@@ -26,6 +26,8 @@ var _panels: Array[TuningPanel] = []
 var _telemetry_vehicle: ArcadeVehicle
 var _telemetry_skill: BrakeDashSkill
 var _telemetry_combat: VehicleCombat
+var _telemetry_momentum: VehicleMomentum
+var _last_contest := "none"
 var _telemetry_timer := 0.0
 
 
@@ -37,6 +39,31 @@ func _ready() -> void:
 	visible = false
 	# Deferred so the match has spawned its cars before we look for them.
 	_bind_targets.call_deferred()
+	ClashArbiter.contest_resolved.connect(_on_contest_resolved)
+
+
+func _on_contest_resolved(
+	first: ArcadeVehicle,
+	second: ArcadeVehicle,
+	winner: ArcadeVehicle,
+	outcome: ClashArbiter.Outcome,
+	closing_speed: float,
+	_position: Vector3
+) -> void:
+	if outcome == ClashArbiter.Outcome.CLASH:
+		_last_contest = "CLASH  %s vs %s  @ %.1f m/s" % [first.name, second.name, closing_speed]
+		return
+	var loser := second if winner == first else first
+	_last_contest = (
+		"%s beat %s  (%s vs %s)  @ %.1f m/s"
+		% [
+			winner.name,
+			loser.name,
+			MomentumTier.name_of(ClashArbiter.tier_of(winner)),
+			MomentumTier.name_of(ClashArbiter.tier_of(loser)),
+			closing_speed,
+		]
+	)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -138,6 +165,9 @@ func _bind_targets() -> void:
 			_add_tuning_tab(child.tuning, "Hit FX")
 		elif child is DriftTrail:
 			_add_tuning_tab(child.tuning, "Trail")
+		elif child is VehicleMomentum:
+			_telemetry_momentum = child
+			_add_tuning_tab(child.tuning, "Momentum")
 	if _telemetry_combat != null:
 		_add_tuning_tab(_telemetry_combat.tuning, "Combat")
 	var rig := _resolve_camera_rig()
@@ -311,6 +341,15 @@ func _update_telemetry() -> void:
 		lines.append(_row("charge", "%.2f s  alpha %.2f" % [_telemetry_skill.current_charge_seconds, _telemetry_skill.current_charge_alpha]))
 		lines.append(_row("override speed", "%.2f" % _telemetry_skill.current_override_speed))
 		lines.append(_row("cooldown", "%.2f s" % _telemetry_skill.cooldown_remaining))
+
+	if _telemetry_momentum != null:
+		lines.append("")
+		lines.append("[b]Momentum[/b]")
+		lines.append(_row("tier", "%s  (charge %.2f)" % [
+			MomentumTier.name_of(_telemetry_momentum.tier), _telemetry_momentum.charge
+		]))
+		lines.append(_row("slip", "%.2f m/s" % _telemetry_momentum.slip()))
+		lines.append(_row("last contest", _last_contest))
 
 	if _telemetry_combat != null:
 		lines.append("")

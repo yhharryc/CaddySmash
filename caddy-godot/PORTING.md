@@ -103,6 +103,58 @@ pulse envelopes start and end at rest, and that `out_back`/`pulse_back` overshoo
 optional `Curve` override in `FeelTuning`, mirroring how UE exposed `UCurveFloat`
 with an analytic fallback.
 
+## Momentum contest
+
+Car-on-car impacts are decided by an explicit, visible rule rather than by tick
+order. Every car sits in one of three momentum states
+(`scripts/combat/vehicle_momentum.gd`); **the higher state wins the contest
+outright and takes no damage at all**, and equal states are a CLASH where both
+sides pay a reduced price and spin out.
+
+Momentum = speed picks a base tier, a genuine slide raises it one, an active dash
+forces the top. It uses **lateral slip, not `is_drifting`** — with grip unheld,
+the default and the shipping feel, `is_drifting` is always true and says nothing
+about commitment. The same flaw was quietly making the 1.1x
+`drifting_impact_multiplier` a constant on every hit ever landed; that is fixed by
+populating `VehicleCollisionEvent.is_drifting` from real slip.
+
+The tier is deliberately sticky — hysteresis on the way down plus a minimum dwell
+time — because a flickering state makes the outline strobe and the rule feel
+arbitrary.
+
+### Why ClashArbiter exists
+
+Collisions used to be resolved by whichever car's `_physics_process` ran first,
+which is tree order, which is spawn order, which is **player number**.
+`_handle_blocking_collision` rewrites its own velocity while resolving, so the
+second car swept into an opponent already slowed and turned. Measured on a
+symmetric head-on: the first-moving car scored on 44.0 m/s of closing speed and
+the other on 14.2 — a deterministic **3.1x advantage to P1**.
+
+`scripts/combat/clash_arbiter.gd` (autoload) fixes it by snapshotting every car's
+velocity at `process_physics_priority = -100`, before anything has moved, and
+resolving each pair exactly once per frame from that snapshot. Closing speed
+becomes a property of the crash rather than of the tick order. Scoring still runs
+through each car's own `ImpactAdjudicator.adjudicate()` — only the closing speed
+is corrected — and the per-attacker cooldown moved to a per-pair one.
+
+`tests/head_on_probe.gd` is the standing proof: it runs the same crash in both
+orders and both must report identical damage.
+
+The arbiter re-emits `impact_dealt` once per resolution so the debug readout keeps
+working, and `ImpactFx` ignores vehicle-target impacts on that signal — it drives
+car effects from `contest_resolved` instead. Handling both would fire hit stop,
+shake and VFX twice per crash.
+
+### Readability
+
+The inverted-hull outline in `VehicleFeel` is now always on, coloured and
+thickened by momentum tier — LOW is deliberately invisible, so "no outline" is
+itself a readable state. An impact flash combines by taking whichever of the two
+is stronger, so a hit always reads and momentum never masks it. On resolution the
+shockwave takes the winner's player colour, and a CLASH gets the heaviest freeze
+in the game.
+
 ## Hit emphasis
 
 Three systems layered on top of the mesh deformation, all scaled by impact tier:

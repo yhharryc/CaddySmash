@@ -16,6 +16,9 @@ extends Node
 @export var visual_root: Node3D
 @export var tuning: FeelTuning
 @export var skill: BrakeDashSkill
+## Drives the always-on outline colour, so a player can read who wins a contest
+## before the crash rather than after it.
+@export var momentum: VehicleMomentum
 
 ## Local-space axes of the car mesh: X width, Y height, Z length.
 const _LENGTH_AXIS := Vector3(0.0, 0.0, 1.0)
@@ -313,18 +316,48 @@ func _impact_scale(delta: float) -> Vector3:
 	)
 
 
-## Flashes the outline in step with the impact envelope.
-func _drive_outline(envelope: float) -> void:
+## The outline serves two jobs at once: it is always on, showing momentum tier by
+## colour and thickness, and an impact flashes it white on top. The two are
+## combined by taking whichever is stronger, so a hit always reads even at low
+## momentum, and momentum never masks a hit.
+func _drive_outline(impact_envelope: float) -> void:
 	if _outlines.is_empty():
 		return
-	var visible_now := envelope > 0.001
+
+	var momentum_color := MomentumTier.COLORS[0]
+	var momentum_weight := 0.0
+	if momentum != null:
+		momentum_color = MomentumTier.color_of(momentum.tier)
+		# Eased so the step between tiers is a swell rather than a jump.
+		momentum_weight = _momentum_outline_weight()
+
+	var impact_weight := clampf(impact_envelope, 0.0, 1.0)
+	var strength := maxf(momentum_weight, impact_weight)
+	var visible_now := strength > 0.001
+
+	# The impact flash wins the colour only while it is the stronger of the two.
+	var color := (
+		tuning.impact_outline_color if impact_weight >= momentum_weight else momentum_color
+	)
+	color.a = strength
+
 	for i in _outlines.size():
 		_outlines[i].visible = visible_now
 		if visible_now:
-			_outline_materials[i].grow_amount = envelope * tuning.impact_outline_grow
-			var color := tuning.impact_outline_color
-			color.a = clampf(envelope, 0.0, 1.0)
+			_outline_materials[i].grow_amount = strength * tuning.impact_outline_grow
 			_outline_materials[i].albedo_color = color
+
+
+## How present the momentum outline is: none at LOW, growing through MID, full at
+## HIGH. LOW is deliberately invisible so "no outline" itself reads as a state.
+func _momentum_outline_weight() -> float:
+	match momentum.tier:
+		MomentumTier.Value.HIGH:
+			return 1.0
+		MomentumTier.Value.MID:
+			return lerpf(0.45, 0.75, Easing.in_out_cubic(momentum.charge))
+		_:
+			return 0.0
 
 
 func _impact_position() -> Vector3:

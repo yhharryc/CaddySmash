@@ -33,6 +33,14 @@ func _physics_process(delta: float) -> void:
 
 
 func _on_blocking_collision(collision: VehicleCollisionEvent) -> void:
+	# Car-on-car goes to the arbiter, which resolves the pair once using velocities
+	# snapshotted before anything moved. Scoring it here would hand the advantage
+	# to whichever car happens to tick first — see clash_arbiter.gd.
+	var target := collision.collider as ArcadeVehicle
+	if collision.target_is_vehicle and target != null:
+		ClashArbiter.report(vehicle, target, collision.normal, collision.position)
+		return
+
 	var impact := adjudicate(collision)
 	if impact == null:
 		return

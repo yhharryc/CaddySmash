@@ -1,4 +1,4 @@
-[gd_scene load_steps=20 format=3]
+[gd_scene load_steps=22 format=3]
 
 [ext_resource type="Script" path="res://scripts/vehicle/arcade_vehicle.gd" id="1_vehicle"]
 [ext_resource type="Resource" path="res://resources/tuning/tuning_default.tres" id="2_tuning"]
@@ -15,6 +15,8 @@
 [ext_resource type="Resource" path="res://resources/tuning/impact_fx_default.tres" id="13_fx_tuning"]
 [ext_resource type="Script" path="res://scripts/fx/drift_trail.gd" id="14_trail"]
 [ext_resource type="Resource" path="res://resources/tuning/drift_trail_default.tres" id="15_trail_tuning"]
+[ext_resource type="Script" path="res://scripts/combat/vehicle_momentum.gd" id="16_momentum"]
+[ext_resource type="Resource" path="res://resources/tuning/momentum_default.tres" id="17_momentum_tuning"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_body"]
 size = Vector3(1.12, 0.7, 1.84)
@@ -56,6 +58,12 @@ script = ExtResource("4_skill")
 vehicle = NodePath("..")
 tuning = ExtResource("5_skill_tuning")
 
+[node name="Momentum" type="Node" parent="." node_paths=PackedStringArray("vehicle", "skill")]
+script = ExtResource("16_momentum")
+vehicle = NodePath("..")
+skill = NodePath("../Skill")
+tuning = ExtResource("17_momentum_tuning")
+
 [node name="Combat" type="Node" parent="." node_paths=PackedStringArray("vehicle", "skill")]
 script = ExtResource("8_combat")
 vehicle = NodePath("..")
@@ -67,17 +75,19 @@ script = ExtResource("6_adjudicator")
 vehicle = NodePath("..")
 tuning = ExtResource("7_impact_tuning")
 
-[node name="Feel" type="Node" parent="." node_paths=PackedStringArray("vehicle", "visual_root", "skill")]
+[node name="Feel" type="Node" parent="." node_paths=PackedStringArray("vehicle", "visual_root", "skill", "momentum")]
 script = ExtResource("10_feel")
 vehicle = NodePath("..")
 visual_root = NodePath("../Visual")
 tuning = ExtResource("11_feel_tuning")
 skill = NodePath("../Skill")
+momentum = NodePath("../Momentum")
 
-[node name="ImpactFx" type="Node" parent="." node_paths=PackedStringArray("vehicle", "adjudicator")]
+[node name="ImpactFx" type="Node" parent="." node_paths=PackedStringArray("vehicle", "adjudicator", "feel")]
 script = ExtResource("12_fx")
 vehicle = NodePath("..")
 adjudicator = NodePath("../Adjudicator")
+feel = NodePath("../Feel")
 tuning = ExtResource("13_fx_tuning")
 
 [node name="DriftTrail" type="MeshInstance3D" parent="." node_paths=PackedStringArray("vehicle")]

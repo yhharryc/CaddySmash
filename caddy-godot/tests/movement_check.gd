@@ -132,6 +132,8 @@ func _run() -> void:
 		"_check_charge_feel",
 		"_check_drift_trail",
 		"_check_shockwave_mesh",
+		"_check_momentum",
+		"_check_contest",
 		"_check_hit_stop",
 		"_check_impact_fx",
 		"_check_tuning_panel",
@@ -241,12 +243,14 @@ func _check_impact_adjudication() -> void:
 	_expect(heavy != null and heavy.apply_stagger, "heavy impacts stagger")
 	_expect(heavy != null and heavy.apply_knockback, "heavy impacts knock back")
 
-	# The cooldown gate only closes on a hit that actually goes through.
+	# Car-on-car no longer resolves here at all: it routes to ClashArbiter so the
+	# pair is scored once from a pre-movement snapshot instead of by whoever
+	# ticked first. The rate limit moved with it, from per-attacker to per-pair.
 	adjudicator._cooldown_remaining = 0.0
 	adjudicator._on_blocking_collision(_make_collision(12.0))
 	_expect(
-		adjudicator.adjudicate(_make_collision(12.0)) == null,
-		"the event cooldown suppresses a second hit"
+		is_zero_approx(adjudicator._cooldown_remaining),
+		"a car-on-car hit no longer arms the per-attacker cooldown"
 	)
 
 	adjudicator.free()
@@ -1127,6 +1131,193 @@ func _check_shockwave_mesh() -> void:
 	)
 
 
+## Momentum is the contest rule, so it has to be both correct and stable — a
+## flickering tier would make the outline strobe and the rule feel arbitrary.
+func _check_momentum() -> void:
+	var momentum := VehicleMomentum.new()
+	momentum.vehicle = _vehicle
+	momentum.tuning = load("res://resources/tuning/momentum_default.tres").duplicate()
+	_vehicle.add_child(momentum)
+	var tuning: MomentumTuning = momentum.tuning
+
+	# Speed picks the base tier.
+	for case in [
+		{"speed": 2.0, "tier": MomentumTier.Value.LOW, "name": "crawling"},
+		{"speed": 13.0, "tier": MomentumTier.Value.MID, "name": "cruising"},
+		{"speed": 21.0, "tier": MomentumTier.Value.HIGH, "name": "flat out"},
+	]:
+		_reset()
+		momentum.tier = MomentumTier.Value.LOW
+		momentum._time_in_tier = 10.0
+		_vehicle.velocity = Vector3(0.0, 0.0, -float(case["speed"]))
+		_settle_momentum(momentum, 20)
+		_expect(
+			momentum.tier == case["tier"],
+			"%s (%.0f m/s) reads %s, got %s"
+			% [
+				case["name"],
+				case["speed"],
+				MomentumTier.name_of(case["tier"]),
+				MomentumTier.name_of(momentum.tier),
+			]
+		)
+
+	# Hysteresis: dipping just under the gate must not drop the tier, or the
+	# outline strobes whenever speed hovers on a boundary.
+	_reset()
+	_vehicle.velocity = Vector3(0.0, 0.0, -21.0)
+	_settle_momentum(momentum, 30)
+	_expect(momentum.tier == MomentumTier.Value.HIGH, "reached high before the dip test")
+	_vehicle.velocity = Vector3(0.0, 0.0, -(tuning.high_speed - tuning.tier_drop_margin * 0.5))
+	_settle_momentum(momentum, 30)
+	_expect(
+		momentum.tier == MomentumTier.Value.HIGH,
+		"a dip inside the drop margin holds the tier (%s)" % MomentumTier.name_of(momentum.tier)
+	)
+	# Falling clear of the margin does drop it.
+	_vehicle.velocity = Vector3(0.0, 0.0, -(tuning.high_speed - tuning.tier_drop_margin * 2.0))
+	_settle_momentum(momentum, 30)
+	_expect(
+		momentum.tier == MomentumTier.Value.MID,
+		"falling clear of the margin drops the tier (%s)" % MomentumTier.name_of(momentum.tier)
+	)
+
+	# A real slide is worth a tier. Note this uses slip, not is_drifting, which
+	# is true by default and so would promote everyone permanently.
+	_reset()
+	_vehicle.velocity = Vector3(0.0, 0.0, -4.0)
+	_settle_momentum(momentum, 30)
+	var without_slip := momentum.tier
+	_vehicle.rotation.y = PI * 0.5
+	_vehicle.velocity = Vector3(0.0, 0.0, -12.0)
+	_settle_momentum(momentum, 30)
+	_expect(
+		momentum.slip() >= tuning.slip_for_bump and momentum.tier > without_slip,
+		"a genuine slide raises the tier (%s -> %s, slip %.1f)"
+		% [
+			MomentumTier.name_of(without_slip),
+			MomentumTier.name_of(momentum.tier),
+			momentum.slip(),
+		]
+	)
+
+	# A dash is the committed move, so it forces the top tier outright.
+	_reset()
+	var skill := _make_skill()
+	momentum.skill = skill
+	skill.state = BrakeDashSkill.State.DASHING
+	momentum.tier = MomentumTier.Value.LOW
+	momentum._time_in_tier = 10.0
+	_settle_momentum(momentum, 20)
+	_expect(
+		momentum.tier == MomentumTier.Value.HIGH,
+		"a dash forces the top tier even from a standstill (%s)"
+		% MomentumTier.name_of(momentum.tier)
+	)
+	skill.state = BrakeDashSkill.State.READY
+	skill.queue_free()
+
+	momentum.queue_free()
+
+
+func _settle_momentum(momentum: VehicleMomentum, ticks: int) -> void:
+	for i in ticks:
+		momentum._physics_process(TICK)
+
+
+## The contest itself: order-independent, decided by momentum, winner clean.
+func _check_contest() -> void:
+	var scene := load("res://scenes/vehicle.tscn") as PackedScene
+	var a := scene.instantiate() as ArcadeVehicle
+	var b := scene.instantiate() as ArcadeVehicle
+	add_child(a)
+	add_child(b)
+	a.name = "ContestA"
+	b.name = "ContestB"
+	a.global_position = Vector3(0.0, 0.35, -6800.0)
+	b.global_position = Vector3(0.0, 0.35, -6797.0)
+
+	var combat_a := VehicleCombat.find_for(a)
+	var combat_b := VehicleCombat.find_for(b)
+	var momentum_a := ClashArbiter.momentum_for(a)
+	var momentum_b := ClashArbiter.momentum_for(b)
+	_expect(
+		combat_a != null and momentum_a != null,
+		"the vehicle scene carries combat and momentum nodes"
+	)
+	if combat_a == null or combat_b == null or momentum_a == null or momentum_b == null:
+		a.queue_free()
+		b.queue_free()
+		return
+
+	# Closing head-on at 10 m/s each: 20 m/s of closing speed either way round.
+	var closing_setup := func() -> void:
+		a.velocity = Vector3(0.0, 0.0, 10.0)
+		b.velocity = Vector3(0.0, 0.0, -10.0)
+		combat_a.health = combat_a.tuning.max_health
+		combat_b.health = combat_b.tuning.max_health
+		ClashArbiter._pair_cooldowns.clear()
+		ClashArbiter._resolved_this_frame.clear()
+		ClashArbiter._snapshot.clear()
+
+	# Higher momentum wins outright and takes nothing.
+	closing_setup.call()
+	momentum_a.tier = MomentumTier.Value.HIGH
+	momentum_b.tier = MomentumTier.Value.LOW
+	ClashArbiter.report(a, b, Vector3.BACK, a.global_position)
+	var loser_damage := combat_b.tuning.max_health - combat_b.health
+	_expect(
+		is_equal_approx(combat_a.health, combat_a.tuning.max_health),
+		"the higher-momentum car takes nothing (%.1f lost)"
+		% (combat_a.tuning.max_health - combat_a.health)
+	)
+	_expect(loser_damage > 0.0, "the lower-momentum car takes the hit (%.1f)" % loser_damage)
+
+	# Reversing who reports the contact must change nothing.
+	closing_setup.call()
+	ClashArbiter.report(b, a, Vector3.BACK, a.global_position)
+	_record(
+		"loser damage, contact reported by the other car",
+		combat_b.tuning.max_health - combat_b.health,
+		"hp",
+		loser_damage,
+		0.001
+	)
+	_expect(
+		is_equal_approx(combat_a.health, combat_a.tuning.max_health),
+		"the winner is still untouched when the loser reports the contact"
+	)
+
+	# Equal momentum is a clash: both pay, neither is spared.
+	closing_setup.call()
+	momentum_b.tier = MomentumTier.Value.HIGH
+	ClashArbiter.report(a, b, Vector3.BACK, a.global_position)
+	var clash_a := combat_a.tuning.max_health - combat_a.health
+	var clash_b := combat_b.tuning.max_health - combat_b.health
+	_expect(clash_a > 0.0 and clash_b > 0.0, "an equal-momentum clash damages both cars")
+	_record("clash damage symmetry", clash_a, "hp", clash_b, 0.001)
+	_expect(
+		clash_a < loser_damage,
+		"a clash costs each side less than losing outright (%.1f vs %.1f)"
+		% [clash_a, loser_damage]
+	)
+
+	# One resolution per pair per frame, however many times it is reported.
+	closing_setup.call()
+	ClashArbiter.report(a, b, Vector3.BACK, a.global_position)
+	var after_first := combat_a.health
+	ClashArbiter.report(b, a, Vector3.BACK, a.global_position)
+	ClashArbiter.report(a, b, Vector3.BACK, a.global_position)
+	_expect(
+		is_equal_approx(combat_a.health, after_first),
+		"repeat reports in the same frame resolve the pair only once"
+	)
+
+	ClashArbiter._pair_cooldowns.clear()
+	a.queue_free()
+	b.queue_free()
+
+
 func _check_hit_stop() -> void:
 	HitStop.cancel()
 	_expect(not HitStop.is_active(), "hit stop starts idle")
@@ -1175,13 +1366,18 @@ func _check_impact_fx() -> void:
 	fx.tuning = load("res://resources/tuning/impact_fx_default.tres").duplicate()
 	_vehicle.add_child(fx)
 
+	# Car-on-car effects come off the contest signal now, not impact_dealt: the
+	# arbiter re-emits impact_dealt for the debug readout, and handling both
+	# would fire hit stop, shake and VFX twice for one crash.
 	var before := get_child_count()
-	var impact := ImpactEvent.new()
-	impact.attacker = _vehicle
-	impact.target = _target
-	impact.tier = ImpactTier.Value.HEAVY
-	impact.position = Vector3(0.0, 0.35, -100.0)
-	adjudicator.impact_dealt.emit(impact)
+	ClashArbiter.contest_resolved.emit(
+		_vehicle,
+		_target,
+		_vehicle,
+		ClashArbiter.Outcome.DECIDED,
+		20.0,
+		Vector3(0.0, 0.35, -100.0)
+	)
 
 	_record("heavy hit freeze", HitStop.freeze_remaining, "s", fx.tuning.heavy_freeze, 0.001)
 	_record("heavy hit slow", HitStop.slow_remaining, "s", fx.tuning.heavy_slow, 0.001)

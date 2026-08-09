@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="MomentumTuning" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/combat/momentum_tuning.gd" id="1_momentum"]
+
+[resource]
+script = ExtResource("1_momentum")
+mid_speed = 10.0
+high_speed = 18.0
+slip_for_bump = 5.0
+dash_forces_high = true
+tier_drop_margin = 1.6
+min_tier_seconds = 0.14

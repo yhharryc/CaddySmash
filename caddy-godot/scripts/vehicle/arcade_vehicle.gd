@@ -51,6 +51,8 @@ func _ready() -> void:
 	motion_mode = CharacterBody3D.MOTION_MODE_FLOATING
 	if tuning == null:
 		tuning = VehicleTuning.new()
+	# ClashArbiter snapshots every car in this group before anything moves.
+	add_to_group(ClashArbiter.VEHICLE_GROUP)
 
 
 func _physics_process(delta: float) -> void:
@@ -424,7 +426,10 @@ func _record_collision(
 	event.tangent = tangent
 	event.total_speed = planar_velocity.length()
 	event.normal_impact_speed = normal_impact_speed
-	event.is_drifting = is_drifting
+	# Real slip, not the is_drifting flag. With grip unheld — the default and the
+	# shipping feel — is_drifting is always true, so it would mark every single
+	# hit as a drift hit and the drift bonus would be a constant, not a bonus.
+	event.is_drifting = absf(get_lateral_speed()) >= tuning.slip_for_drift_bonus
 	event.is_skill_dashing = skill_dashing
 	event.target_is_vehicle = event.collider is ArcadeVehicle
 
