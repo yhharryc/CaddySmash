@@ -49,6 +49,20 @@ extends Resource
 ## Optional override. X is normalised pulse time, Y is strength.
 @export var impact_pulse_curve: Curve
 
+@export_group("Momentum outline")
+## Outline strength at MID. LOW is always zero — no outline at all is itself a
+## readable state, and it keeps the low tier visually quiet.
+@export var momentum_outline_mid: float = 0.62
+## Outline strength at HIGH.
+@export var momentum_outline_high: float = 1.0
+## Thickness multiplier at HIGH, on top of impact_outline_grow. This is what
+## makes the top tier read as exaggerated rather than just brighter.
+@export var high_outline_scale: float = 2.4
+## Pulse rate of the HIGH outline, in Hz.
+@export var outline_pulse_hz: float = 5.5
+## How much of the HIGH outline thickness the pulse swings, 0..1.
+@export_range(0.0, 1.0) var outline_pulse_amount: float = 0.4
+
 @export_group("Impact outline")
 ## Inverted-hull outline flashed on impact, for a comic-book emphasis frame.
 @export var enable_impact_outline: bool = true

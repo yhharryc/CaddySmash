@@ -1,4 +1,4 @@
-[gd_scene load_steps=9 format=3]
+[gd_scene load_steps=10 format=3]
 
 [ext_resource type="PackedScene" path="res://scenes/vehicle.tscn" id="1_vehicle"]
 [ext_resource type="Script" path="res://scripts/arena/circular_arena.gd" id="2_arena"]
@@ -7,6 +7,7 @@
 [ext_resource type="Script" path="res://scripts/ui/match_hud.gd" id="5_hud"]
 [ext_resource type="Resource" path="res://resources/tuning/camera_arena.tres" id="6_cam_tuning"]
 [ext_resource type="Script" path="res://scripts/debug/debug_menu.gd" id="7_debug"]
+[ext_resource type="Script" path="res://scripts/debug/tuning_preset_switcher.gd" id="8_presets"]
 
 [sub_resource type="Environment" id="Environment_main"]
 background_mode = 1
@@ -26,8 +27,8 @@ shadow_enabled = true
 
 [node name="Arena" type="Node3D" parent="."]
 script = ExtResource("2_arena")
-radius = 26.0
-pillar_ring_radius = 12.0
+radius = 19.0
+pillar_ring_radius = 9.0
 
 [node name="Vehicles" type="Node3D" parent="."]
 
@@ -79,3 +80,6 @@ theme_override_font_sizes/font_size = 64
 script = ExtResource("7_debug")
 match_manager = NodePath("../MatchManager")
 camera_rig = NodePath("../CameraRig")
+
+[node name="TuningPresets" type="CanvasLayer" parent="."]
+script = ExtResource("8_presets")

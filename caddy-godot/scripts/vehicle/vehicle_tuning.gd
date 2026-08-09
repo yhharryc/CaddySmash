@@ -6,6 +6,10 @@ extends Resource
 ## Godot project works in meters. Interp speeds and angles are unitless and
 ## carry over unchanged. The UE default is noted next to each value.
 
+## Shown by the preset switcher. Port of the naming on UE's runtime tuning
+## presets, which were cycled with caddy.vehicle.tuning.next/prev.
+@export var preset_name: String = "Default"
+
 @export_group("Gas")
 ## UE MaxForwardSpeed 2200 cm/s.
 @export var max_forward_speed: float = 22.0

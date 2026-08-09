@@ -174,7 +174,34 @@ func _bind_targets() -> void:
 	if rig != null:
 		_add_tuning_tab(rig.tuning, "Camera")
 
+	# Swapping a handling preset replaces the resource the Handling tab points at.
+	# Without rebinding, that tab would go on editing a resource no car is using.
+	for node in get_tree().get_nodes_in_group(TuningPresetSwitcher.GROUP):
+		if node is TuningPresetSwitcher and not node.preset_changed.is_connected(_on_preset_changed):
+			node.preset_changed.connect(_on_preset_changed)
+
 	_refresh_status()
+
+
+func _on_preset_changed(tuning: VehicleTuning, _index: int) -> void:
+	_rebuild_tabs()
+	if _status_label != null:
+		_status_label.text = "Rebound to preset: %s" % tuning.preset_name
+		_status_label.add_theme_color_override("font_color", Color(0.5, 0.9, 0.6))
+
+
+## Discards every tab and rebuilds from the cars' current resources. Any unsaved
+## edits go with them, which is why the status line says so.
+func _rebuild_tabs() -> void:
+	if _tabs == null:
+		return
+	for child in _tabs.get_children():
+		_tabs.remove_child(child)
+		child.queue_free()
+	_panels.clear()
+	_telemetry_label = null
+	_telemetry_momentum = null
+	_bind_targets()
 
 
 func _add_tuning_tab(resource: Resource, title: String) -> void:

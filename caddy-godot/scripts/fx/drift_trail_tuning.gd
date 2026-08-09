@@ -4,10 +4,13 @@ extends Resource
 
 @export_group("Trigger")
 @export var enabled: bool = true
-## Lateral slip, in m/s, before a ribbon starts. Below this the car is gripping
-## and there is nothing to draw.
-@export var slip_threshold: float = 2.5
-## Lateral slip that maps to a full-width, full-brightness ribbon.
+## Trails are gated on momentum tier, not on sliding. LOW lays nothing down even
+## in a full slide; MID and HIGH always lay a ribbon even driving dead straight.
+## The trail is a readout of momentum, so it has to agree with the outline.
+@export var mid_strength: float = 0.6
+@export var high_strength: float = 1.0
+## Slip still modulates within a tier, so a slide reads wider and brighter than
+## a straight line at the same momentum.
 @export var slip_for_full_effect: float = 9.0
 ## Minimum forward speed before trails appear, so a spinning stationary car
 ## does not smear the ground.
@@ -22,6 +25,15 @@ extends Resource
 ## Distance the car must travel before another segment is laid down.
 @export var sample_distance: float = 0.22
 @export var max_segments: int = 48
+
+@export_group("Tire sparks")
+## Sparks thrown from the rear wheels at top momentum only, so the highest state
+## has a signature nothing else shares.
+@export var enable_tire_sparks: bool = true
+@export var spark_color: Color = Color(1.0, 0.85, 0.5, 1.0)
+@export var spark_amount: int = 26
+@export var spark_lifetime: float = 0.34
+@export var spark_speed: float = 7.0
 
 @export_group("Look")
 ## Multiplied by the player colour so each car's trail reads as theirs.

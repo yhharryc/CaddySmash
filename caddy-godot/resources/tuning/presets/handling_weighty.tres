@@ -1,0 +1,34 @@
+[gd_resource type="Resource" script_class="VehicleTuning" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/vehicle/vehicle_tuning.gd" id="1_tuning"]
+
+[resource]
+script = ExtResource("1_tuning")
+preset_name = "Weighty 2.4g - HIGH at 8.4 m"
+max_forward_speed = 22.0
+forward_acceleration = 24.0
+coast_deceleration = 14.0
+brake_deceleration = 34.0
+max_reverse_speed = 9.2
+reverse_acceleration = 36.0
+steering_rate_deg = 540.0
+min_speed_for_steering = 1.2
+linear_drag = 0.3
+stop_speed_threshold = 0.08
+move_intent_dead_zone = 0.12
+drift_lateral_friction = 2.5
+grip_lateral_friction = 7.5
+drift_steering_rate_multiplier = 1.35
+grip_input_threshold = 0.85
+enable_input_relative_reverse_steering = true
+reverse_steering_enter_speed = 1.2
+reverse_steering_exit_speed = 0.7
+collision_response_mode = 1
+max_collision_iterations = 2
+speed_retain_ratio = 0.62
+wall_glide_velocity_interp_speed = 14.0
+wall_glide_input_assist = 0.45
+min_normal_impact_speed_for_glide = 1.4
+min_wall_glide_speed = 2.6
+head_on_glide_speed_scale = 0.5
+push_out_distance = 0.03

@@ -90,9 +90,10 @@ adjudicator = NodePath("../Adjudicator")
 feel = NodePath("../Feel")
 tuning = ExtResource("13_fx_tuning")
 
-[node name="DriftTrail" type="MeshInstance3D" parent="." node_paths=PackedStringArray("vehicle")]
+[node name="DriftTrail" type="MeshInstance3D" parent="." node_paths=PackedStringArray("vehicle", "momentum")]
 script = ExtResource("14_trail")
 vehicle = NodePath("..")
+momentum = NodePath("../Momentum")
 tuning = ExtResource("15_trail_tuning")
 
 [node name="Driver" type="Node" parent="." node_paths=PackedStringArray("vehicle", "skill")]

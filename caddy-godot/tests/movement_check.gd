@@ -136,6 +136,7 @@ func _run() -> void:
 		"_check_contest",
 		"_check_hit_stop",
 		"_check_impact_fx",
+		"_check_handling_presets",
 		"_check_tuning_panel",
 	]:
 		_log_progress("start %s" % check)
@@ -1053,29 +1054,58 @@ func _peak_swing(feel: VehicleFeel, skill: BrakeDashSkill, alpha: float) -> floa
 	return peak
 
 
-## The skid ribbon only appears on a real slide, and dies out on its own.
+## The ribbon is a momentum readout, not a slide readout: low momentum lays
+## nothing down even mid-slide, and mid or high always lays one down even in a
+## straight line. It has to agree with the outline or the two would contradict.
 func _check_drift_trail() -> void:
 	var trail := DriftTrail.new()
 	trail.vehicle = _vehicle
 	trail.tuning = load("res://resources/tuning/drift_trail_default.tres")
+	var momentum := VehicleMomentum.new()
+	momentum.vehicle = _vehicle
+	momentum.tuning = load("res://resources/tuning/momentum_default.tres")
+	_vehicle.add_child(momentum)
+	trail.momentum = momentum
 	_vehicle.add_child(trail)
 
 	_reset()
-	_expect(is_zero_approx(trail.slip_strength()), "a parked car lays no trail")
+	momentum.tier = MomentumTier.Value.LOW
+	_expect(is_zero_approx(trail.emission_strength()), "a parked car lays no trail")
 
-	# Driving straight is not a slide, however fast.
+	# Low momentum lays nothing down even in a full slide.
 	_drive(3.0, 1.0, 0.0, Vector3.FORWARD)
+	_vehicle.rotation.y = PI * 0.5
+	momentum.tier = MomentumTier.Value.LOW
 	_expect(
-		is_zero_approx(trail.slip_strength()),
-		"driving straight lays no trail (slip %.2f)" % absf(_vehicle.get_lateral_speed())
+		trail.slip_ratio() > 0.5 and is_zero_approx(trail.emission_strength()),
+		"low momentum lays no trail even while sliding hard (slip %.2f)" % trail.slip_ratio()
 	)
 
-	# Rotate the body off its velocity: now it is sliding sideways.
+	# Mid momentum lays one down even driving dead straight.
+	_reset()
+	_drive(3.0, 1.0, 0.0, Vector3.FORWARD)
+	momentum.tier = MomentumTier.Value.MID
+	_expect(
+		is_zero_approx(trail.slip_ratio()) and trail.emission_strength() > 0.0,
+		"mid momentum lays a trail with no slide at all (%.2f)" % trail.emission_strength()
+	)
+
+	# High is stronger than mid at the same slip.
+	var mid_strength := trail.emission_strength()
+	momentum.tier = MomentumTier.Value.HIGH
+	_expect(
+		trail.emission_strength() > mid_strength,
+		"high momentum lays a stronger trail than mid (%.2f vs %.2f)"
+		% [trail.emission_strength(), mid_strength]
+	)
+
+	# Sliding still widens the ribbon within a tier.
 	_vehicle.rotation.y = PI * 0.5
 	_expect(
-		trail.slip_strength() > 0.5,
-		"a hard slide lays a trail (strength %.2f)" % trail.slip_strength()
+		trail.emission_strength() >= mid_strength,
+		"sliding does not weaken the ribbon"
 	)
+	momentum.tier = MomentumTier.Value.HIGH
 
 	# Samples accumulate along the slide, then age out once it stops.
 	for i in 40:
@@ -1085,6 +1115,7 @@ func _check_drift_trail() -> void:
 	_expect(laid > 0, "the slide laid down %d ribbon segments" % laid)
 
 	_reset()
+	momentum.tier = MomentumTier.Value.LOW
 	for i in int(ceil(trail.tuning.lifetime / TICK)) + 10:
 		trail._process(TICK)
 	_expect(
@@ -1093,6 +1124,7 @@ func _check_drift_trail() -> void:
 	)
 
 	trail.queue_free()
+	momentum.queue_free()
 
 
 func _check_shockwave_mesh() -> void:
@@ -1409,6 +1441,92 @@ func _check_impact_fx() -> void:
 	fx.queue_free()
 	adjudicator.queue_free()
 	rig.queue_free()
+
+
+## The handling presets have to be genuinely different, ordered, and applied to
+## every car — comparing feel is meaningless if the two sides of a fight are on
+## different numbers.
+func _check_handling_presets() -> void:
+	var switcher := TuningPresetSwitcher.new()
+	switcher.show_label = false
+	add_child(switcher)
+
+	_expect(
+		switcher.presets.size() == TuningPresetSwitcher.DEFAULT_PRESET_PATHS.size(),
+		"every default preset loads (%d of %d)"
+		% [switcher.presets.size(), TuningPresetSwitcher.DEFAULT_PRESET_PATHS.size()]
+	)
+	if switcher.presets.is_empty():
+		switcher.queue_free()
+		return
+
+	# Ordered from snappiest to heaviest, and every step is a real change.
+	var previous := INF
+	var all_named := true
+	for preset in switcher.presets:
+		_expect(
+			preset.forward_acceleration < previous,
+			"preset '%s' accelerates slower than the one before (%.0f)"
+			% [preset.preset_name, preset.forward_acceleration]
+		)
+		previous = preset.forward_acceleration
+		if preset.preset_name.is_empty():
+			all_named = false
+		# Top speed is held constant on purpose: the only variable under test is
+		# how long the car takes to get there.
+		_expect(
+			is_equal_approx(preset.max_forward_speed, 22.0),
+			"preset '%s' keeps top speed at 22 m/s" % preset.preset_name
+		)
+	_expect(all_named, "every preset carries a name for the on-screen readout")
+
+	# Applying reaches every car in the group, not just the first.
+	var applied: VehicleTuning = switcher.presets[2]
+	switcher.apply_preset(2)
+	_expect(
+		_vehicle.tuning == applied and _target.tuning == applied,
+		"applying a preset reaches every car in the match"
+	)
+	_expect(switcher.active_preset() == applied, "the switcher reports the active preset")
+
+	# Cycling wraps in both directions.
+	switcher.apply_preset(0)
+	switcher.cycle(-1)
+	_expect(
+		switcher.active_index == switcher.presets.size() - 1,
+		"cycling back from the first preset wraps to the last (%d)" % switcher.active_index
+	)
+	switcher.cycle(1)
+	_expect(switcher.active_index == 0, "cycling forward wraps back to the first")
+
+	# And the presets actually change how the car drives.
+	var fast := _time_to_speed(switcher.presets[0], 18.0)
+	var slow := _time_to_speed(switcher.presets[switcher.presets.size() - 1], 18.0)
+	_record("time to HIGH gate, snappiest preset", fast, "s", 0.32, 0.15)
+	_expect(
+		slow > fast * 2.0,
+		"the heaviest preset takes far longer to reach the HIGH gate (%.2fs vs %.2fs)"
+		% [slow, fast]
+	)
+
+	# Leave the cars on the shipping tuning for anything that runs after.
+	_vehicle.tuning = load("res://resources/tuning/tuning_default.tres")
+	_target.tuning = _vehicle.tuning
+	switcher.queue_free()
+
+
+func _time_to_speed(tuning: VehicleTuning, target_speed: float) -> float:
+	var previous := _vehicle.tuning
+	_vehicle.tuning = tuning
+	_reset()
+	var elapsed := 0.0
+	var guard := 0
+	while _vehicle.get_planar_speed() < target_speed and guard < 1200:
+		_drive(TICK, 1.0, 0.0, Vector3.FORWARD)
+		elapsed += TICK
+		guard += 1
+	_vehicle.tuning = previous
+	return elapsed
 
 
 func _check_tuning_panel() -> void:

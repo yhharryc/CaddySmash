@@ -5,7 +5,8 @@
 [resource]
 script = ExtResource("1_trail")
 enabled = true
-slip_threshold = 2.5
+mid_strength = 0.6
+high_strength = 1.0
 slip_for_full_effect = 9.0
 min_speed = 3.0
 wheel_offset = Vector3(0.46, -0.3, 0.72)
@@ -14,5 +15,10 @@ lifetime = 0.85
 sample_distance = 0.22
 max_segments = 48
 tint = Color(1, 0.75, 0.35, 1)
+enable_tire_sparks = true
+spark_color = Color(1, 0.85, 0.5, 1)
+spark_amount = 26
+spark_lifetime = 0.34
+spark_speed = 7.0
 additive = true
 ground_offset = 0.03

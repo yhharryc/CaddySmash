@@ -41,8 +41,39 @@ players claim a seat, one per device, then any of them starts the match.
 | Brake / reverse | Q | LT, B |
 | Brake-dash (hold to charge, release to fire) | Space | X |
 | Grip (tuning aid) | Ctrl | LB |
-| Debug HUD (`test_track` only) | F1 | |
+| Debug menu | F1 | |
+| Next / previous handling preset | F2 / F3 | |
 | Respawn all cars | R | |
+
+## Handling presets
+
+Port of the runtime tuning presets on `ACaddyVehiclePawn`, which Unreal cycled
+through `caddy.vehicle.tuning.next` / `.prev` / `.set`. Bound to **F2/F3** here,
+with the active preset shown bottom-right.
+
+Five presets in `resources/tuning/presets/`, ordered snappiest to heaviest. **Top
+speed is held at 22 m/s across all of them** so the only variable is how long the
+car takes to get there; brake and coast scale with acceleration so momentum keeps
+a consistent weight.
+
+| preset | accel | distance to HIGH momentum |
+|---|---|---|
+| Stock | 62 (6.3 g) | 3.2 m |
+| Quick | 45 (4.6 g) | 4.2 m |
+| Balanced | 32 (3.3 g) | 6.2 m |
+| Weighty | 24 (2.4 g) | 8.4 m |
+| Heavy | 18 (1.8 g) | 11.7 m |
+
+Distance-to-HIGH is the number that matters: below it a car cannot win a contest.
+The arena is 38 m across, so Stock reaches top tier in 8% of it — which is why
+almost every fight resolved as a CLASH and the momentum rule rarely decided
+anything. Regenerate the table after any change with
+`res://tests/acceleration_probe.tscn`.
+
+The switcher applies the preset to **every** car, since comparing feel only means
+something if both sides of a fight are on the same numbers. The debug menu
+rebinds its Handling tab when a preset changes, or it would go on editing a
+resource no car is using.
 
 ## Local multiplayer
 
@@ -148,12 +179,23 @@ shake and VFX twice per crash.
 
 ### Readability
 
-The inverted-hull outline in `VehicleFeel` is now always on, coloured and
-thickened by momentum tier — LOW is deliberately invisible, so "no outline" is
-itself a readable state. An impact flash combines by taking whichever of the two
-is stronger, so a hit always reads and momentum never masks it. On resolution the
-shockwave takes the winner's player colour, and a CLASH gets the heaviest freeze
-in the game.
+Each tier gets a signature nothing else shares, so the state is legible before
+the crash rather than after it:
+
+| | outline | trail | extras |
+|---|---|---|---|
+| **LOW** | none | **none, even mid-slide** | — |
+| **MID** | steady, tier colour | **always, even driving straight** | — |
+| **HIGH** | exaggerated (2.4x) + pulsing | always, strongest | tire sparks |
+
+The trail is gated on **momentum, not on sliding** — it has to agree with the
+outline, so a sliding LOW car lays nothing down and a straight-line MID car does.
+Slip still modulates width and brightness *within* a tier.
+
+The inverted-hull outline in `VehicleFeel` serves both jobs: an
+impact flash combines by taking whichever of the two is stronger, so a hit always
+reads and momentum never masks it. On resolution the shockwave takes the winner's
+player colour, and a CLASH gets the heaviest freeze in the game.
 
 ## Hit emphasis
 

@@ -13,8 +13,12 @@ extends MeshInstance3D
 
 @export var vehicle: ArcadeVehicle
 @export var tuning: DriftTrailTuning
+## Gates the whole effect. The trail is a momentum readout, not a slide readout.
+@export var momentum: VehicleMomentum
 ## Set by the match to the player's colour.
 @export var color: Color = Color(1.0, 0.75, 0.35)
+
+var _sparks: Array[GPUParticles3D] = []
 
 ## Each entry: {"pos": Vector3, "right": Vector3, "age": float, "strength": float}
 var _left: Array[Dictionary] = []
@@ -45,20 +49,37 @@ func _ready() -> void:
 	material_override = material
 
 
-## 0..1 measure of how hard the car is currently sliding sideways.
-func slip_strength() -> float:
+## 0..1 ribbon strength. Momentum decides whether there is a trail at all;
+## sliding only widens and brightens whatever the tier already allows.
+func emission_strength() -> float:
 	if vehicle == null or not tuning.enabled:
 		return 0.0
 	if vehicle.get_planar_speed() < tuning.min_speed:
 		return 0.0
-	var slip := absf(vehicle.get_lateral_speed())
-	if slip < tuning.slip_threshold:
+
+	var base := 0.0
+	if momentum == null:
+		# No momentum node (e.g. a bare test rig): fall back to slip alone.
+		base = slip_ratio()
+	else:
+		match momentum.tier:
+			MomentumTier.Value.HIGH:
+				base = tuning.high_strength
+			MomentumTier.Value.MID:
+				base = tuning.mid_strength
+			_:
+				# Low momentum lays nothing down, however hard it is sliding.
+				return 0.0
+
+	return clampf(maxf(base, base * 0.6 + slip_ratio() * 0.4), 0.0, 1.0)
+
+
+## How hard the car is sliding, 0..1, independent of momentum.
+func slip_ratio() -> float:
+	if vehicle == null:
 		return 0.0
 	return clampf(
-		(slip - tuning.slip_threshold)
-		/ maxf(0.01, tuning.slip_for_full_effect - tuning.slip_threshold),
-		0.0,
-		1.0
+		absf(vehicle.get_lateral_speed()) / maxf(0.01, tuning.slip_for_full_effect), 0.0, 1.0
 	)
 
 
@@ -68,6 +89,67 @@ func _process(delta: float) -> void:
 	_age_segments(delta)
 	_maybe_sample()
 	_rebuild()
+	_update_sparks()
+
+
+## Tire sparks are the top tier's exclusive signature, so they are bound to HIGH
+## rather than to speed or slip.
+func _update_sparks() -> void:
+	if not tuning.enable_tire_sparks:
+		return
+	if _sparks.is_empty():
+		_build_sparks()
+
+	var active := (
+		momentum != null
+		and momentum.tier == MomentumTier.Value.HIGH
+		and vehicle.get_planar_speed() >= tuning.min_speed
+	)
+	var forward := vehicle.planar_forward()
+	var right := vehicle.planar_right()
+	var offset := tuning.wheel_offset
+	var base := vehicle.global_position - forward * offset.z
+
+	for i in _sparks.size():
+		var side := -1.0 if i == 0 else 1.0
+		_sparks[i].global_position = base + right * offset.x * side
+		_sparks[i].emitting = active
+
+
+func _build_sparks() -> void:
+	for i in 2:
+		var particles := GPUParticles3D.new()
+		particles.top_level = true
+		particles.emitting = false
+		particles.amount = maxi(1, tuning.spark_amount)
+		particles.lifetime = tuning.spark_lifetime
+		particles.local_coords = false
+
+		var process := ParticleProcessMaterial.new()
+		process.direction = Vector3(0.0, 0.4, 1.0)
+		process.spread = 35.0
+		process.initial_velocity_min = tuning.spark_speed * 0.4
+		process.initial_velocity_max = tuning.spark_speed
+		process.gravity = Vector3(0.0, -14.0, 0.0)
+		process.scale_min = 0.25
+		process.scale_max = 0.6
+		process.color = tuning.spark_color
+		particles.process_material = process
+
+		var quad := QuadMesh.new()
+		quad.size = Vector2(0.1, 0.1)
+		particles.draw_pass_1 = quad
+
+		var material := StandardMaterial3D.new()
+		material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		material.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+		material.vertex_color_use_as_albedo = true
+		material.albedo_color = tuning.spark_color
+		particles.material_override = material
+
+		add_child(particles)
+		_sparks.append(particles)
 
 
 func _age_segments(delta: float) -> void:
@@ -83,7 +165,7 @@ func _age_segments(delta: float) -> void:
 
 
 func _maybe_sample() -> void:
-	var strength := slip_strength()
+	var strength := emission_strength()
 	var position := vehicle.global_position
 
 	if strength <= 0.0:

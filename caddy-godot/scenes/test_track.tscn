@@ -1,4 +1,4 @@
-[gd_scene load_steps=13 format=3]
+[gd_scene load_steps=14 format=3]
 
 [ext_resource type="PackedScene" path="res://scenes/vehicle.tscn" id="1_vehicle"]
 [ext_resource type="Script" path="res://scripts/debug/test_arena.gd" id="2_arena"]
@@ -7,6 +7,7 @@
 [ext_resource type="Script" path="res://scripts/debug/vehicle_debug_hud.gd" id="5_debug_hud"]
 [ext_resource type="Resource" path="res://resources/tuning/camera_chase.tres" id="6_cam_tuning"]
 [ext_resource type="Script" path="res://scripts/debug/debug_menu.gd" id="7_debug"]
+[ext_resource type="Script" path="res://scripts/debug/tuning_preset_switcher.gd" id="8_presets"]
 
 [sub_resource type="PlaneMesh" id="PlaneMesh_ground"]
 size = Vector2(200, 200)
@@ -95,3 +96,6 @@ label_settings = SubResource("LabelSettings_hud")
 script = ExtResource("7_debug")
 vehicle = NodePath("../Vehicle")
 camera_rig = NodePath("../CameraRig")
+
+[node name="TuningPresets" type="CanvasLayer" parent="."]
+script = ExtResource("8_presets")

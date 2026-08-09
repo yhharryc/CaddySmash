@@ -47,6 +47,7 @@ var _charge_phase := 0.0
 ## Inverted-hull copies of each mesh, shown only while an impact is playing.
 var _outlines: Array[MeshInstance3D] = []
 var _outline_materials: Array[StandardMaterial3D] = []
+var _outline_pulse_phase := 0.0
 
 
 func _ready() -> void:
@@ -301,7 +302,7 @@ func _impact_envelope(delta: float) -> float:
 ## grows least, the axis across it grows most, so the direction still reads.
 func _impact_scale(delta: float) -> Vector3:
 	var envelope := _impact_envelope(delta)
-	_drive_outline(envelope)
+	_drive_outline(envelope, delta)
 	var amount := envelope * tuning.impact_inflate
 	if is_zero_approx(amount):
 		return Vector3.ZERO
@@ -320,44 +321,51 @@ func _impact_scale(delta: float) -> Vector3:
 ## colour and thickness, and an impact flashes it white on top. The two are
 ## combined by taking whichever is stronger, so a hit always reads even at low
 ## momentum, and momentum never masks a hit.
-func _drive_outline(impact_envelope: float) -> void:
+func _drive_outline(impact_envelope: float, delta: float) -> void:
 	if _outlines.is_empty():
 		return
 
 	var momentum_color := MomentumTier.COLORS[0]
 	var momentum_weight := 0.0
+	# Thickness multiplier, so HIGH can be exaggerated rather than merely brighter.
+	var grow_scale := 1.0
+
 	if momentum != null:
 		momentum_color = MomentumTier.color_of(momentum.tier)
-		# Eased so the step between tiers is a swell rather than a jump.
-		momentum_weight = _momentum_outline_weight()
+		match momentum.tier:
+			MomentumTier.Value.HIGH:
+				_outline_pulse_phase += delta * TAU * tuning.outline_pulse_hz
+				var pulse := sin(_outline_pulse_phase) * 0.5 + 0.5
+				momentum_weight = tuning.momentum_outline_high
+				grow_scale = tuning.high_outline_scale * (
+					1.0 - tuning.outline_pulse_amount + tuning.outline_pulse_amount * pulse * 2.0
+				)
+			MomentumTier.Value.MID:
+				_outline_pulse_phase = 0.0
+				momentum_weight = tuning.momentum_outline_mid
+			_:
+				# LOW shows nothing at all. "No outline" is itself a state.
+				_outline_pulse_phase = 0.0
+				momentum_weight = 0.0
 
 	var impact_weight := clampf(impact_envelope, 0.0, 1.0)
 	var strength := maxf(momentum_weight, impact_weight)
 	var visible_now := strength > 0.001
 
 	# The impact flash wins the colour only while it is the stronger of the two.
-	var color := (
-		tuning.impact_outline_color if impact_weight >= momentum_weight else momentum_color
-	)
+	var impact_wins := impact_weight >= momentum_weight
+	var color := tuning.impact_outline_color if impact_wins else momentum_color
 	color.a = strength
+	if impact_wins:
+		grow_scale = 1.0
 
 	for i in _outlines.size():
 		_outlines[i].visible = visible_now
 		if visible_now:
-			_outline_materials[i].grow_amount = strength * tuning.impact_outline_grow
+			_outline_materials[i].grow_amount = (
+				strength * tuning.impact_outline_grow * grow_scale
+			)
 			_outline_materials[i].albedo_color = color
-
-
-## How present the momentum outline is: none at LOW, growing through MID, full at
-## HIGH. LOW is deliberately invisible so "no outline" itself reads as a state.
-func _momentum_outline_weight() -> float:
-	match momentum.tier:
-		MomentumTier.Value.HIGH:
-			return 1.0
-		MomentumTier.Value.MID:
-			return lerpf(0.45, 0.75, Easing.in_out_cubic(momentum.charge))
-		_:
-			return 0.0
 
 
 func _impact_position() -> Vector3:
