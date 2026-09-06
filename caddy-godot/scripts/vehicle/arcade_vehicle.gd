@@ -59,11 +59,56 @@ func _physics_process(delta: float) -> void:
 	if delta <= _DEAD_SMALL:
 		return
 
+	simulate(delta)
+
+
+## One entry point for advancing the car by a frame, so the same call serves the
+## live game and a prediction replay. Nothing here reads live input: whatever set
+## the input fields did so before this ran, which is what makes a replay of
+## recorded input reproduce the same motion.
+func simulate(delta: float) -> void:
 	if not external_velocity_control:
 		_update_velocity(delta)
 		_update_steering(delta)
 
 	_perform_movement(delta)
+
+
+## Everything a rewind has to restore. Includes the input-derived fields as well
+## as the simulation ones, so a restored car resumes identically even before the
+## next input is applied.
+func capture_state() -> Dictionary:
+	return {
+		"pos": global_position,
+		"yaw": rotation.y,
+		"vel": velocity,
+		"move_intent": move_intent,
+		"has_move_intent": has_move_intent,
+		"throttle": throttle_input,
+		"brake": brake_reverse_input,
+		"grip": grip_input,
+		"drifting": is_drifting,
+		"reverse_steer": reverse_steering_active,
+		"external": external_velocity_control,
+		"locked": control_locked,
+		"dashing": skill_dashing,
+	}
+
+
+func apply_state(state: Dictionary) -> void:
+	global_position = state.get("pos", global_position)
+	rotation.y = state.get("yaw", rotation.y)
+	velocity = state.get("vel", velocity)
+	move_intent = state.get("move_intent", move_intent)
+	has_move_intent = state.get("has_move_intent", has_move_intent)
+	throttle_input = state.get("throttle", throttle_input)
+	brake_reverse_input = state.get("brake", brake_reverse_input)
+	grip_input = state.get("grip", grip_input)
+	is_drifting = state.get("drifting", is_drifting)
+	reverse_steering_active = state.get("reverse_steer", reverse_steering_active)
+	external_velocity_control = state.get("external", external_velocity_control)
+	control_locked = state.get("locked", control_locked)
+	skill_dashing = state.get("dashing", skill_dashing)
 
 
 # ---------------------------------------------------------------------------

@@ -43,7 +43,8 @@ players claim a seat, one per device, then any of them starts the match.
 | Grip (tuning aid) | Ctrl | LB |
 | Debug menu | F1 | |
 | Next / previous handling preset | F2 / F3 | |
-| Respawn all cars | R | |
+| Toggle fullscreen | F11 / Alt+Enter | |
+| Reset the whole field (revives everyone) | R | |
 
 ## Handling presets
 
@@ -196,6 +197,24 @@ The inverted-hull outline in `VehicleFeel` serves both jobs: an
 impact flash combines by taking whichever of the two is stronger, so a hit always
 reads and momentum never masks it. On resolution the shockwave takes the winner's
 player colour, and a CLASH gets the heaviest freeze in the game.
+
+## Combat pacing
+
+`tests/combat_probe.tscn` reports, per tier, the input lock, the distance
+knockback actually moves the victim, and how long the attacker needs to re-close
+that gap at top speed. The last column — lock minus re-close — is what decides
+whether hits chain for free.
+
+The first measurement showed every tier was a free chain (0.32 / 0.48 / 0.67 s of
+spare time), because knockback moved the victim 0.7-3.0 m while the lock ran
+0.35-0.80 s, and 3 m is nothing at 22 m/s. **Both halves had to move**: a shorter
+lock alone still chains. Locks came down to 0.20 / 0.30 / 0.45 s and knockback up
+to 2.4 / 3.9 / 6.0 m, leaving windows of 0.09 / 0.12 / 0.18 s — combos survive but
+have to be earned.
+
+Note the probe is a best case for the attacker: it assumes they are already at top
+speed on a straight line back. In a real exchange the arcade glide has redirected
+them too, so the practical window is tighter than the table says.
 
 ## Hit emphasis
 

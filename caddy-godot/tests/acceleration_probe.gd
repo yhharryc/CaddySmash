@@ -29,7 +29,7 @@ func _ready() -> void:
 	_vehicle.tuning = _base_tuning.duplicate()
 	var shape := CollisionShape3D.new()
 	var box := BoxShape3D.new()
-	box.size = Vector3(1.12, 0.7, 1.84)
+	box.size = Vector3(1.4, 0.875, 2.3)
 	shape.shape = box
 	_vehicle.add_child(shape)
 	add_child(_vehicle)

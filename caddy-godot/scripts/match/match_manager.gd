@@ -5,6 +5,8 @@ extends Node
 signal player_spawned(slot: PlayerSlot, vehicle: ArcadeVehicle)
 signal player_eliminated(slot: PlayerSlot)
 signal match_finished(winner: PlayerSlot)
+## Everyone revived and back on their spawn.
+signal match_reset
 
 @export var vehicle_scene: PackedScene
 @export var arena: CircularArena
@@ -51,6 +53,9 @@ func _spawn_all() -> void:
 		if driver != null:
 			driver.set_device(slot.device)
 			driver.set_spawn_transform(vehicle.global_transform)
+			# The match resets the whole field; a per-car respawn would only bring
+			# back whoever was still alive to press the key.
+			driver.handles_reset = false
 
 		for child in vehicle.get_children():
 			if child is BrakeDashSkill:
@@ -85,6 +90,43 @@ func _tint(vehicle: ArcadeVehicle, color: Color) -> void:
 			(child as DriftTrail).color = color
 		elif child is ImpactFx:
 			(child as ImpactFx).color = color
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if event.is_action_pressed("caddy_reset"):
+		reset_match()
+		get_viewport().set_input_as_handled()
+
+
+## Revives everyone, alive or not, and puts the field back on its spawns. The
+## old behaviour reset only cars whose driver was still enabled, which excluded
+## exactly the players most likely to want a reset.
+func reset_match() -> void:
+	eliminated.clear()
+	finished = false
+
+	for i in slots.size():
+		var slot := slots[i]
+		var vehicle: ArcadeVehicle = vehicles.get(slot.index)
+		if vehicle == null:
+			continue
+
+		var combat: VehicleCombat = combats.get(slot.index)
+		if combat != null:
+			combat.revive()
+
+		var driver := _find_driver(vehicle)
+		if driver != null:
+			driver.enabled = true
+			# Spawns are recomputed rather than reused: the arena may have been
+			# resized in the debug menu since the match began.
+			driver.set_spawn_transform(arena.get_spawn_transform(i, slots.size()))
+			driver.respawn()
+
+		_tint(vehicle, slot.color())
+
+	_refresh_camera_targets()
+	match_reset.emit()
 
 
 func _on_player_destroyed(slot: PlayerSlot) -> void:

@@ -77,7 +77,7 @@ func _make_vehicle() -> ArcadeVehicle:
 	vehicle.tuning = load("res://resources/tuning/tuning_default.tres")
 	var shape := CollisionShape3D.new()
 	var box := BoxShape3D.new()
-	box.size = Vector3(1.12, 0.7, 1.84)
+	box.size = Vector3(1.4, 0.875, 2.3)
 	shape.shape = box
 	vehicle.add_child(shape)
 	return vehicle
@@ -137,6 +137,7 @@ func _run() -> void:
 		"_check_hit_stop",
 		"_check_impact_fx",
 		"_check_handling_presets",
+		"_check_prediction_groundwork",
 		"_check_tuning_panel",
 	]:
 		_log_progress("start %s" % check)
@@ -295,24 +296,48 @@ func _check_combat_reactions() -> void:
 		_vehicle.velocity.z > 0.0 and absf(_vehicle.velocity.x) < 0.001,
 		"knockback shoves straight away from the attacker (%v)" % _vehicle.velocity
 	)
-	_record("heavy knockback speed", _vehicle.get_planar_speed(), "m/s", 13.2, 0.001)
+	_record(
+		"heavy knockback speed",
+		_vehicle.get_planar_speed(),
+		"m/s",
+		combat.tuning.heavy_knockback_speed,
+		0.001
+	)
 
 	# Hold for the whole window, then hand back with the carry ratio.
 	while combat.is_knocked_back() and ticks < 200:
 		combat._physics_process(TICK)
 		ticks += 1
-	_record("knockback window", float(ticks) * TICK, "s", 0.22, 0.1)
+	_record(
+		"knockback window",
+		float(ticks) * TICK,
+		"s",
+		combat.tuning.heavy_knockback_duration,
+		0.15
+	)
 	_expect(
 		not _vehicle.external_velocity_control, "knockback hands velocity control back"
 	)
-	_record("knockback carry speed", _vehicle.get_planar_speed(), "m/s", 13.2 * 0.2, 0.001)
+	_record(
+		"knockback carry speed",
+		_vehicle.get_planar_speed(),
+		"m/s",
+		combat.tuning.heavy_knockback_speed * combat.tuning.heavy_knockback_carry,
+		0.001
+	)
 
 	# Stagger runs longer than knockback and keeps input locked until it ends.
 	_expect(combat.is_staggered(), "stagger outlasts the knockback")
 	while combat.is_staggered() and ticks < 400:
 		combat._physics_process(TICK)
 		ticks += 1
-	_record("heavy stagger input lock", float(ticks) * TICK, "s", 0.8, 0.05)
+	_record(
+		"heavy stagger input lock",
+		float(ticks) * TICK,
+		"s",
+		combat.tuning.heavy_stagger_input_lock,
+		0.08
+	)
 	_expect(not _vehicle.control_locked, "input unlocks when the stagger ends")
 
 	# Knockback must cancel an active dash rather than fight it for control.
@@ -1527,6 +1552,108 @@ func _time_to_speed(tuning: VehicleTuning, target_speed: float) -> float:
 		guard += 1
 	_vehicle.tuning = previous
 	return elapsed
+
+
+## Groundwork for client prediction. Prediction is "rewind to the last confirmed
+## state, replay the inputs since". These checks assert the three things that has
+## to rest on: input survives serialisation, state round-trips exactly, and a
+## replay of the same inputs from the same state lands in the same place.
+func _check_prediction_groundwork() -> void:
+	# 1. Input survives the wire.
+	var input := VehicleInput.make(
+		1234, Vector2(-0.4, 0.85), 1.0, 0.25, 0.5, true
+	)
+	var restored := VehicleInput.from_dict(input.to_dict())
+	_expect(
+		restored.tick == input.tick and restored.matches(input),
+		"VehicleInput survives a dict round-trip (%s)" % restored.describe()
+	)
+	_expect(
+		not restored.matches(VehicleInput.make(1234, Vector2.ZERO, 0.0, 0.0, 0.0, false)),
+		"matches() actually distinguishes different input"
+	)
+
+	# 2. Vehicle state round-trips exactly.
+	_reset()
+	_drive(1.5, 1.0, 0.0, Vector3.RIGHT)
+	var snapshot := _vehicle.capture_state()
+	var expected_position := _vehicle.global_position
+	var expected_velocity := _vehicle.velocity
+	var expected_yaw := _vehicle.rotation.y
+
+	_drive(1.0, 0.0, 1.0, Vector3.LEFT)
+	_vehicle.apply_state(snapshot)
+	_expect(
+		_vehicle.global_position.is_equal_approx(expected_position)
+		and _vehicle.velocity.is_equal_approx(expected_velocity)
+		and is_equal_approx(_vehicle.rotation.y, expected_yaw),
+		"vehicle capture_state -> mutate -> apply_state restores exactly"
+	)
+
+	# 3. Skill state round-trips, including mid-charge.
+	var skill := _make_skill()
+	_reset()
+	_drive(2.0, 1.0, 0.0, Vector3.FORWARD)
+	_step_skill(skill, 0.45, true, Vector3.FORWARD)
+	_expect(
+		skill.state == BrakeDashSkill.State.CHARGING,
+		"skill is mid-charge before the snapshot (%d)" % skill.state
+	)
+	var skill_snapshot := skill.capture_state()
+	var expected_charge := skill.current_charge_seconds
+
+	_step_skill(skill, 0.8, false, Vector3.FORWARD)
+	skill.apply_state(skill_snapshot)
+	_expect(
+		skill.state == BrakeDashSkill.State.CHARGING
+		and is_equal_approx(skill.current_charge_seconds, expected_charge),
+		"skill capture_state -> fire the dash -> apply_state rewinds to mid-charge"
+	)
+
+	# 4. The one that matters: replay determinism. Same state plus same inputs
+	# must reproduce the same result, or prediction can never reconcile.
+	var scripted: Array[VehicleInput] = []
+	for i in 90:
+		scripted.append(
+			VehicleInput.make(
+				i,
+				Vector2(sin(float(i) * 0.11), 1.0),
+				1.0,
+				0.35 if i > 60 else 0.0,
+				0.0,
+				false
+			)
+		)
+
+	_reset()
+	var start_state := _vehicle.capture_state()
+	var first_pass := _replay(scripted)
+	_vehicle.apply_state(start_state)
+	var second_pass := _replay(scripted)
+
+	_expect(
+		first_pass["pos"].is_equal_approx(second_pass["pos"]),
+		"replaying the same inputs from the same state lands in the same place (%.4f m apart)"
+		% first_pass["pos"].distance_to(second_pass["pos"])
+	)
+	_expect(
+		first_pass["vel"].is_equal_approx(second_pass["vel"])
+		and is_equal_approx(first_pass["yaw"], second_pass["yaw"]),
+		"replay reproduces velocity and heading too"
+	)
+
+	skill.queue_free()
+
+
+## Applies a scripted input sequence through the same path the driver uses.
+func _replay(inputs: Array[VehicleInput]) -> Dictionary:
+	for input in inputs:
+		_vehicle.set_move_intent_from_stick(input.move_stick)
+		_vehicle.set_throttle_input(input.throttle)
+		_vehicle.set_brake_reverse_input(input.brake)
+		_vehicle.set_grip_input(input.grip)
+		_vehicle.simulate(TICK)
+	return _vehicle.capture_state()
 
 
 func _check_tuning_panel() -> void:

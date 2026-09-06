@@ -123,6 +123,24 @@ func apply_damage(amount: float, impact: ImpactEvent = null) -> void:
 		destroyed.emit()
 
 
+## Full reset back to fighting condition, including clearing any effect that was
+## mid-flight. Without the effect clear, a car revived during its own knockback
+## keeps external velocity control and can never be driven again.
+func revive() -> void:
+	health = tuning.max_health
+	knockback_remaining = 0.0
+	_knockback_hold_speed = 0.0
+	_knockback_carry_speed = 0.0
+	if _stagger_active:
+		_finish_stagger()
+	_stagger_active = false
+	stagger_remaining = 0.0
+	if vehicle != null:
+		vehicle.set_external_velocity_control_enabled(false)
+		vehicle.set_control_lock_enabled(false)
+	health_changed.emit(health, tuning.max_health)
+
+
 func heal(amount: float) -> void:
 	if amount <= 0.0:
 		return

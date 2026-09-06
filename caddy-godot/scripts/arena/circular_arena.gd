@@ -40,7 +40,7 @@ func get_spawn_transform(index: int, count: int) -> Transform3D:
 	var slots := maxi(1, count)
 	var angle := TAU * (float(index) / float(slots))
 	var spawn_radius := radius * spawn_ring_fraction
-	var offset := Vector3(sin(angle) * spawn_radius, 0.35, cos(angle) * spawn_radius)
+	var offset := Vector3(sin(angle) * spawn_radius, 0.44, cos(angle) * spawn_radius)
 
 	# Face the middle. heading_to_yaw maps a direction to the -Z forward basis.
 	var facing := Vector3(-offset.x, 0.0, -offset.z).normalized()

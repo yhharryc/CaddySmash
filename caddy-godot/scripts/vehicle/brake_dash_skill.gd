@@ -59,6 +59,47 @@ func _ready() -> void:
 		tuning = SkillTuning.new()
 
 
+## Rewind support for client prediction. Easy to overlook and fatal if missed: a
+## rewind that restores the car's position but not the dash phase resimulates
+## from the wrong state machine and diverges immediately.
+func capture_state() -> Dictionary:
+	return {
+		"state": state,
+		"elapsed": state_elapsed,
+		"cooldown": cooldown_remaining,
+		"hold": trigger_hold_seconds,
+		"pressed": skill_input_pressed,
+		"latch": _trigger_latch,
+		"aim": current_aim,
+		"dash_dir": dash_direction,
+		"override": current_override_speed,
+		"charge_s": current_charge_seconds,
+		"charge_a": current_charge_alpha,
+		"dash_duration": active_dash_duration,
+		"dash_peak": active_dash_peak_speed,
+		"brake_speed": _braking_start_speed,
+		"brake_dir": _braking_direction,
+	}
+
+
+func apply_state(snapshot: Dictionary) -> void:
+	state = snapshot.get("state", state)
+	state_elapsed = snapshot.get("elapsed", state_elapsed)
+	cooldown_remaining = snapshot.get("cooldown", cooldown_remaining)
+	trigger_hold_seconds = snapshot.get("hold", trigger_hold_seconds)
+	skill_input_pressed = snapshot.get("pressed", skill_input_pressed)
+	_trigger_latch = snapshot.get("latch", _trigger_latch)
+	current_aim = snapshot.get("aim", current_aim)
+	dash_direction = snapshot.get("dash_dir", dash_direction)
+	current_override_speed = snapshot.get("override", current_override_speed)
+	current_charge_seconds = snapshot.get("charge_s", current_charge_seconds)
+	current_charge_alpha = snapshot.get("charge_a", current_charge_alpha)
+	active_dash_duration = snapshot.get("dash_duration", active_dash_duration)
+	active_dash_peak_speed = snapshot.get("dash_peak", active_dash_peak_speed)
+	_braking_start_speed = snapshot.get("brake_speed", _braking_start_speed)
+	_braking_direction = snapshot.get("brake_dir", _braking_direction)
+
+
 func is_active() -> bool:
 	return state != State.READY
 

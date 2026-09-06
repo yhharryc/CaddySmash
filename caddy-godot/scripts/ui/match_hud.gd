@@ -18,6 +18,7 @@ func _ready() -> void:
 	match_manager.player_spawned.connect(_on_player_spawned)
 	match_manager.player_eliminated.connect(_on_player_eliminated)
 	match_manager.match_finished.connect(_on_match_finished)
+	match_manager.match_reset.connect(_on_match_reset)
 
 
 func _on_player_spawned(slot: PlayerSlot, _vehicle: ArcadeVehicle) -> void:
@@ -102,6 +103,16 @@ func _on_player_eliminated(slot: PlayerSlot) -> void:
 	if name_label != null:
 		name_label.text = "%s OUT" % slot.label()
 		name_label.add_theme_color_override("font_color", Color(0.5, 0.5, 0.55))
+
+
+## Clears the OUT marks and the winner banner left over from the last round.
+func _on_match_reset() -> void:
+	_banner.visible = false
+	for slot in match_manager.slots:
+		var name_label: Label = _names.get(slot.index)
+		if name_label != null:
+			name_label.text = slot.label()
+			name_label.add_theme_color_override("font_color", slot.color())
 
 
 func _on_match_finished(winner: PlayerSlot) -> void:
