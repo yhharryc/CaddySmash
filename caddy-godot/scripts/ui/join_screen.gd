@@ -6,6 +6,7 @@ extends Control
 ## whole point of this screen is telling one pad apart from another.
 
 const MATCH_SCENE := "res://scenes/arena_match.tscn"
+const ONLINE_SCENE := "res://scenes/online_lobby.tscn"
 ## At least this many seats filled before the match can start. One is allowed so
 ## the arena can be tested solo.
 const MIN_PLAYERS := 1
@@ -17,6 +18,7 @@ const MIN_PLAYERS := 1
 var _previous_join := {}
 var _previous_leave := {}
 var _previous_start := {}
+var _previous_online := {}
 
 var _slot_panels: Array[PanelContainer] = []
 var _slot_labels: Array[Label] = []
@@ -55,6 +57,12 @@ func _poll_devices() -> void:
 			if PlayerRoster.count() >= MIN_PLAYERS:
 				_start_match()
 				return
+
+		# Whoever opens the online lobby is the device that drives online.
+		if _just_pressed(_previous_online, key, device.is_online_pressed()):
+			NetworkManager.local_device = device
+			get_tree().change_scene_to_file(ONLINE_SCENE)
+			return
 
 	if changed:
 		_refresh()
@@ -130,6 +138,7 @@ func _refresh() -> void:
 		)
 	else:
 		_hint_label.text = "Press A on a controller, or Enter on the keyboard, to join"
+	_hint_label.text += "\nY / O to play online over Steam"
 
 
 func _slot_for_index(index: int) -> PlayerSlot:

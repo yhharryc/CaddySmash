@@ -6,6 +6,11 @@ signal player_spawned(slot: PlayerSlot, vehicle: ArcadeVehicle)
 signal player_eliminated(slot: PlayerSlot)
 signal match_finished(winner: PlayerSlot)
 
+## Loaded by path rather than named as a class: NetMatchSync holds a typed
+## reference back to MatchManager, and a class_name cycle between the two is
+## exactly what makes the GDScript resolver spin (see PORTING.md).
+const _NET_SYNC_SCRIPT := "res://scripts/networking/net_match_sync.gd"
+
 @export var vehicle_scene: PackedScene
 @export var arena: CircularArena
 @export var camera_rig: VehicleCameraRig
@@ -68,6 +73,14 @@ func _spawn_all() -> void:
 
 	camera_rig.set_targets(targets)
 
+	# Online: one node keeps this match in step with the other machines. Added
+	# after the cars exist and at the same path everywhere, so its RPCs resolve.
+	if NetworkManager.is_online():
+		var sync: Node = load(_NET_SYNC_SCRIPT).new()
+		sync.name = "NetMatchSync"
+		sync.set("match_manager", self)
+		add_child(sync)
+
 
 ## Gives each car its player colour. The scene ships a shared material, so this
 ## has to be a per-instance override or every car would change together.
@@ -125,6 +138,15 @@ func _check_for_winner() -> void:
 		if not eliminated.has(slot.index):
 			finished = true
 			match_finished.emit(slot)
+			return
+
+
+## Wrecks a seat by index. Online, only the host decides who is destroyed; it
+## announces each elimination and clients apply it through here.
+func eliminate(slot_index: int) -> void:
+	for slot in slots:
+		if slot.index == slot_index:
+			_on_player_destroyed(slot)
 			return
 
 

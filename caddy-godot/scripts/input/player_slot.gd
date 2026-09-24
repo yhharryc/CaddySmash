@@ -13,6 +13,11 @@ const COLORS: Array[Color] = [
 ## 0-based seat. Player number shown to the user is index + 1.
 var index: int = 0
 var device: InputDevice = null
+## Multiplayer peer that owns this seat. 1 is the host, which also covers every
+## seat in a couch game.
+var peer_id: int = 1
+## Steam persona name in an online match; empty for couch players.
+var player_name: String = ""
 
 
 static func make(seat_index: int, seat_device: InputDevice) -> PlayerSlot:

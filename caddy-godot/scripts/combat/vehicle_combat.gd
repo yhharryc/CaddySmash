@@ -123,6 +123,25 @@ func apply_damage(amount: float, impact: ImpactEvent = null) -> void:
 		destroyed.emit()
 
 
+## Online clients: the host already decided this hit and took the health off, so
+## only the knockback and stagger are replayed, on the car this client predicts.
+func apply_reactions(impact: ImpactEvent) -> void:
+	if impact.apply_knockback:
+		_start_knockback(impact)
+	if impact.apply_stagger:
+		_start_stagger(impact)
+
+
+## Online clients: health comes from the host's snapshots. Deliberately never
+## emits destroyed — the host announces eliminations, they are not inferred here.
+func set_network_health(value: float) -> void:
+	var clamped := clampf(value, 0.0, tuning.max_health)
+	if is_equal_approx(clamped, health):
+		return
+	health = clamped
+	health_changed.emit(health, tuning.max_health)
+
+
 func heal(amount: float) -> void:
 	if amount <= 0.0:
 		return

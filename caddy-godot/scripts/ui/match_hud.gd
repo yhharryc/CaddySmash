@@ -49,7 +49,10 @@ func _on_player_spawned(slot: PlayerSlot, _vehicle: ArcadeVehicle) -> void:
 	row.add_child(skill_label)
 
 	var device_label := Label.new()
-	device_label.text = slot.device.display_name() if slot.device != null else ""
+	if not slot.player_name.is_empty():
+		device_label.text = slot.player_name
+	else:
+		device_label.text = slot.device.display_name() if slot.device != null else ""
 	device_label.add_theme_font_size_override("font_size", 12)
 	device_label.add_theme_color_override("font_color", Color(0.65, 0.68, 0.75))
 	row.add_child(device_label)

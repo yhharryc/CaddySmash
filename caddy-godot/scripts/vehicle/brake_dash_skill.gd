@@ -250,6 +250,24 @@ func abort_to_ready() -> void:
 	_clear_target()
 
 
+## Online clients: mirrors the host's skill state onto a car this machine does
+## not simulate, so the HUD readout and the feel layer's charge and dash effects
+## still play. Fires the same signals a local transition would.
+func apply_network_state(new_state: State, charge_alpha: float, cooldown: float) -> void:
+	current_charge_alpha = charge_alpha
+	cooldown_remaining = cooldown
+	if new_state == state:
+		return
+
+	var previous := state
+	_set_state(new_state)
+	if new_state == State.DASHING:
+		dash_direction = _fallback_aim_direction()
+		dash_started.emit(dash_direction, charge_alpha, active_dash_peak_speed)
+	elif previous == State.DASHING:
+		dash_finished.emit(0.0)
+
+
 func _set_state(new_state: State) -> void:
 	var previous := state
 	state = new_state

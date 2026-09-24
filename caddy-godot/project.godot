@@ -20,6 +20,7 @@ config/icon="res://icon.svg"
 PlayerRoster="*res://scripts/input/player_roster.gd"
 HitStop="*res://scripts/fx/hit_stop.gd"
 ClashArbiter="*res://scripts/combat/clash_arbiter.gd"
+NetworkManager="*res://scripts/networking/network_manager.gd"
 
 [debug]
 

@@ -110,6 +110,56 @@ lateral roll included, which is what `test_track.tscn` uses.
 Keyboard accelerate is **Shift only**: the dash took Space, and the two cannot
 share a key.
 
+## Online multiplayer (Steam)
+
+Press **Y / O** on the join screen to open `scenes/online_lobby.tscn`. Host
+creates a friends-only Steam lobby; friends join through an overlay invite,
+"Join Game" on the Steam friends list, the lobby's "Friends playing" button, or
+by pasting the lobby code. The host presses **Start match**; **Backspace** (host)
+takes everyone back to the lobby. Everything lives in `scripts/networking/`.
+
+Transport is GodotSteam's built-in `SteamMultiplayerPeer`, bound to the lobby
+with `host_with_lobby` / `connect_to_lobby`. Traffic rides Steam Datagram
+Relay, so there is no port forwarding and no NAT setup. `no_nagle` is on so a
+small packet goes out the tick it is written instead of being batched.
+
+**Host-authoritative with client-side prediction** (`net_match_sync.gd`):
+
+- The host simulates every car. Remote cars are driven through the ordinary
+  `PlayerVehicleDriver`, fed by a `NetworkInputDevice` that holds the owner's
+  newest input frame, so nothing on the vehicle side knows about the network.
+- The host sends a snapshot of every car each physics tick (60 Hz, ~50 bytes
+  per car, packed floats, unreliable).
+- **Your own car is predicted**: it simulates locally from your input the same
+  tick you press it. Each snapshot carries the input tick the host last
+  consumed for you; the client compares the host's state with its own recorded
+  state for that tick and eases the difference out (`correction_rate`), or
+  snaps past `snap_distance`. History newer than the ack is shifted by the same
+  correction, or the next snapshot would correct the same error twice.
+- **Everyone else's car is a puppet**: simulation off, drawn
+  `interpolation_delay_ticks` (3, ~50 ms) behind the newest snapshot, coasting
+  on velocity for up to `extrapolation_limit_ticks` when packets stop.
+- **Only the host scores.** `ClashArbiter.report` returns early when
+  `multiplayer.is_server()` is false. Offline the default peer counts as the
+  server, so the couch game and every test are unaffected. The host broadcasts
+  contests (clients re-emit `contest_resolved`, so `ImpactFx` plays hit stop,
+  shake and shockwave exactly as offline), impacts (the owning client replays
+  knockback and stagger on its predicted car via `VehicleCombat.apply_reactions`)
+  and eliminations. Health comes from the snapshots through
+  `set_network_health`, which never emits `destroyed`.
+- Nobody drives until every machine has loaded the arena, or 10 s pass.
+
+Testing notes:
+
+- App id is still **480 (Spacewar)**. Everyone needs Steam running and signed
+  in, and your friends' Steam status will say "Spacewar". Lobbies are tagged
+  `game=caddy_smash` so a stranger's Spacewar lobby is rejected.
+- Friends need an exported build of the same commit. Two copies on one PC
+  cannot test this: Steam allows one signed-in user per machine.
+- Tuning presets (F2/F3) and debug-menu edits are **local only**. Change them
+  on one machine and the prediction on the others drifts; keep everyone on the
+  same numbers.
+
 ## Feel layer
 
 `scripts/vehicle/vehicle_feel.gd` is the port of `UCaddyVehicleFeelComponent`.
@@ -301,8 +351,9 @@ surface normal per contact — at 64 segments the normal turns 5.6° per joint.
 - GAS. No ability system, no gameplay effects, no attribute replication.
 - Feel layer (`UCaddyVehicleFeelComponent`): engine vibration, squash/stretch,
   lean, impact pulse, hit stop.
-- Networking. The Unreal build is server-authoritative with client input RPCs;
-  nothing here is replicated.
+- Unreal's replication itself. The Unreal build is server-authoritative with
+  client input RPCs; online play here takes the same shape over Steam (see
+  Online multiplayer) but is its own implementation, not a port.
 
 ## Conversions applied
 

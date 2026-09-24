@@ -77,5 +77,11 @@ func _physics_process(_delta: float) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	# Not marked handled: with several drivers in the scene, consuming the event
 	# here would reset only the first one.
-	if vehicle != null and enabled and event.is_action_pressed("caddy_reset"):
+	# Online, only the host respawns; clients snap to it through the snapshots.
+	if (
+		vehicle != null
+		and enabled
+		and multiplayer.is_server()
+		and event.is_action_pressed("caddy_reset")
+	):
 		respawn()
