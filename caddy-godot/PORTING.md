@@ -40,7 +40,7 @@ players claim a seat, one per device, then any of them starts the match.
 | Accelerate | Shift | RT, A |
 | Brake / reverse | Q | LT, B |
 | Brake-dash (hold to charge, release to fire) | Space | X |
-| Grip (tuning aid) | Ctrl | LB |
+| Grip (tuning aid) | J | LB |
 | Debug menu | F1 | |
 | Next / previous handling preset | F2 / F3 | |
 | Respawn all cars | R | |
