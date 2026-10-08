@@ -1,12 +1,15 @@
-[gd_resource type="Resource" script_class="CombatTuning" format=3 uid="uid://bs1ggsuu18es1"]
+[gd_resource type="Resource" script_class="CombatTuning" format=3]
 
-[ext_resource type="Script" uid="uid://dmoe88dhdjejo" path="res://scripts/combat/combat_tuning.gd" id="1_combat"]
+[ext_resource type="Script" path="res://scripts/combat/combat_tuning.gd" id="1_combat"]
 
 [resource]
 script = ExtResource("1_combat")
+medium_knockback_duration = 0.3000000000029104
+heavy_knockback_speed = 13.19999999999709
+heavy_knockback_duration = 0.4499999999970896
 light_stagger_duration = 0.25
 light_stagger_input_lock = 0.25
-medium_stagger_duration = 0.35000000000582077
-medium_stagger_input_lock = 0.35000000000582077
-heavy_stagger_duration = 0.5
-heavy_stagger_input_lock = 0.5
+medium_stagger_duration = 0.3000000000029104
+medium_stagger_input_lock = 0.3000000000029104
+heavy_stagger_duration = 0.4499999999970896
+heavy_stagger_input_lock = 0.4499999999970896

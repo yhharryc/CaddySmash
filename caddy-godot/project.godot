@@ -21,6 +21,8 @@ PlayerRoster="*res://scripts/input/player_roster.gd"
 HitStop="*res://scripts/fx/hit_stop.gd"
 ClashArbiter="*res://scripts/combat/clash_arbiter.gd"
 NetworkManager="*res://scripts/networking/network_manager.gd"
+TuningOverrides="*res://scripts/debug/tuning_overrides.gd"
+TuningSync="*res://scripts/networking/tuning_sync.gd"
 
 [debug]
 

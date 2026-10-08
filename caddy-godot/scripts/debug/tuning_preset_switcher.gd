@@ -8,7 +8,9 @@ extends CanvasLayer
 ## caddy.vehicle.tuning.next / .prev / .set. Bound to F2 and F3 here.
 ##
 ## The preset is applied to **every** car, not just the local one: comparing feel
-## is only meaningful if both sides of a fight are on the same numbers.
+## is only meaningful if both sides of a fight are on the same numbers. Online
+## that extends across machines: only the host can switch, and TuningSync carries
+## the choice to everyone.
 
 ## Other debug tools watch this to re-point themselves at the new resource.
 const GROUP := &"tuning_preset_switcher"
@@ -46,23 +48,40 @@ func _ready() -> void:
 				presets.append(preset)
 	if show_label:
 		_build_label()
+	TuningSync.preset_changed.connect(_on_host_preset_changed)
+	TuningOverrides.overrides_changed.connect(_refresh_label)
 	# Deferred: the cars do not exist yet while the scene is still being built.
 	_adopt_current.call_deferred()
 
 
 ## Picks up whatever the cars already ship with, so nothing changes until a key
 ## is pressed. If that resource is one of the presets, start from its index.
+## Online, a client takes the host's preset instead, and the host announces its.
 func _adopt_current() -> void:
+	if TuningSync.is_client() and TuningSync.preset_index >= 0:
+		apply_preset(TuningSync.preset_index, false)
+		return
 	var car := _first_vehicle()
+	var found := -1
 	if car != null and car.tuning != null:
-		var found := presets.find(car.tuning)
+		found = presets.find(car.tuning)
 		if found >= 0:
 			active_index = found
+	# -1 when the cars ship on a tuning file that is not one of the presets (the
+	# arena's default): clients then keep their cars on that same file rather than
+	# switching to preset 0.
+	TuningSync.notify_preset(found)
 	_refresh_label()
 
 
+func _on_host_preset_changed(index: int) -> void:
+	if TuningSync.is_client() and index >= 0:
+		apply_preset(index, false)
+
+
 func _unhandled_input(event: InputEvent) -> void:
-	if presets.is_empty():
+	# Host-only online: a client's F2/F3 would just be overwritten.
+	if presets.is_empty() or TuningSync.is_client():
 		return
 	if event.is_action_pressed("caddy_tuning_next"):
 		cycle(1)
@@ -76,7 +95,9 @@ func cycle(step: int) -> void:
 	apply_preset(active_index + step)
 
 
-func apply_preset(index: int) -> void:
+## `announce` is false when applying a preset the host chose, so a client does
+## not try to send it back.
+func apply_preset(index: int, announce: bool = true) -> void:
 	if presets.is_empty():
 		return
 
@@ -91,6 +112,8 @@ func apply_preset(index: int) -> void:
 			car.tuning = preset
 
 	_refresh_label()
+	if announce:
+		TuningSync.notify_preset(active_index)
 	preset_changed.emit(preset, active_index)
 
 
@@ -139,3 +162,8 @@ func _refresh_label() -> void:
 			preset.max_forward_speed,
 		]
 	)
+	# Always on screen in a match, so a build playing on saved overrides is never
+	# mistaken for the project's own numbers.
+	var saved := TuningOverrides.saved_count()
+	if saved > 0:
+		_label.text += "\n%d saved tuning override%s active   [F1]" % [saved, "" if saved == 1 else "s"]

@@ -156,9 +156,9 @@ Testing notes:
   `game=caddy_smash` so a stranger's Spacewar lobby is rejected.
 - Friends need an exported build of the same commit. Two copies on one PC
   cannot test this: Steam allows one signed-in user per machine.
-- Tuning presets (F2/F3) and debug-menu edits are **local only**. Change them
-  on one machine and the prediction on the others drifts; keep everyone on the
-  same numbers.
+- Tuning is **host-only** online: the host's debug-menu edits and F2/F3 presets
+  reach every machine, and clients are view-only. See
+  [Tuning online](#tuning-online).
 
 ## Feel layer
 
@@ -309,7 +309,59 @@ that instance, so a dragged value is felt at once.
   amber, shows its previous value inline, and marks its tab with `*`.
 - **Save** — pops a confirm dialog listing every pending change as
   `property: old -> new`, then writes each changed Resource back to its `.tres`.
+  In an exported build it writes the overrides file instead (below).
 - **Revert** — restores every edited value from the baseline.
+- **Copy changes** — puts every value that differs from the shipped `.tres`
+  files on the clipboard, grouped by file, ready to paste back into them.
+- **Reset overrides** — builds only: deletes the overrides file and returns to
+  the shipped values.
+
+### Tuning in exported builds
+
+An exported build cannot write its own `.tres` files: `res://` is read-only, and
+this project's export packs it inside the `.exe` (`embed_pck=true`). So
+`scripts/debug/tuning_overrides.gd` (autoload `TuningOverrides`) saves to
+`user://tuning_overrides.cfg` — on Windows
+`%APPDATA%\Godot\app_userdata\Caddy_Godot\` — and **loads it automatically at
+startup**. Only changed values are stored, per tuning file and property.
+
+- Running from the editor, Save still writes the `.tres` files and the
+  overrides file is **never loaded**. The editor and builds share the same
+  `user://` folder, so it has to skip the file rather than just not write it;
+  otherwise a build's experiments would leak into development.
+- A build on saved overrides says so: the bottom-right handling label shows
+  "N saved tuning overrides active", and so does the F1 menu.
+- To make a session's numbers permanent: **Copy changes**, paste them into the
+  `.tres` files, commit, then **Reset overrides** in the build.
+- `TuningOverrides` loads every tuning file at startup to record its shipped
+  values before anything edits them, and keeps them referenced so the cars get
+  the same instances from the resource cache. **A new tuning `.tres` must be
+  added to `SYNCED_PATHS`** (or `LOCAL_ONLY_PATHS` for per-player settings like
+  the camera), or it will not be synced, saved as an override, or reset.
+
+### Tuning online
+
+`scripts/networking/tuning_sync.gd` (autoload `TuningSync`) keeps everyone in an
+online match on the **host's** tuning. Only the host can edit:
+
+- Every F1 edit, Revert and Reset on the host is sent to all clients (reliable
+  RPC, keyed by the tuning file's path and the property name). F2/F3 preset
+  switches are sent the same way; clients' F2/F3 do nothing.
+- When a client connects, the host sends **every** tuning value it has, not
+  just its edits, so a friend on an older build still plays the host's numbers.
+- On a client the menu is **view-only**: controls are disabled, host changes
+  appear live with "Host set … → …", and the status line says the host owns
+  tuning. The **Camera tab stays editable** — it is per-player and never synced.
+- When a client leaves the session it goes back to its own shipped values plus
+  its own saved overrides.
+
+This matters for more than fairness. Each client simulates its own car from its
+local tuning to predict it (see NetMatchSync), so a handling value it never
+received would make its prediction disagree with the host and rubber-band.
+
+The host announces preset `-1` when the cars are on the arena's own
+`tuning_default.tres` rather than one of the presets, so clients stay on that
+same file instead of switching to preset 0.
 
 Camera settings moved out of node exports into a `CameraTuning` Resource for this
 reason: node properties cannot be saved without writing the whole scene, and the
