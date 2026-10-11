@@ -58,9 +58,10 @@ func _poll_devices() -> void:
 				_start_match()
 				return
 
-		# Whoever opens the online lobby is the device that drives online.
+		# Any device can open the online screen. It does not pick the online
+		# controller: the player confirms that there, deliberately, so a keyboard
+		# press here can never leave a pad player stuck on the keyboard.
 		if _just_pressed(_previous_online, key, device.is_online_pressed()):
-			NetworkManager.local_device = device
 			get_tree().change_scene_to_file(ONLINE_SCENE)
 			return
 

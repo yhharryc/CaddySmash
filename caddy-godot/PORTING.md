@@ -149,6 +149,39 @@ small packet goes out the tick it is written instead of being batched.
   `set_network_health`, which never emits `destroyed`.
 - Nobody drives until every machine has loaded the arena, or 10 s pass.
 
+**Confirm a controller first.** The online screen opens on a prompt: press **A**
+on the pad you'll play with, or **Enter** for the keyboard. Host, Join, the
+lobby-code box and the Friends-playing buttons stay disabled until then. That
+device — and only that device — drives this machine's car. **Change controller**
+redoes it any time before the match starts; the choice is kept for the rest of
+the run, so it is one press per launch.
+
+- A Steam invite, "Join Game" from the friends list, or a `+connect_lobby`
+  launch that arrives before confirming is **held** (`pending_lobby_id`), shown
+  as "Joining <name>'s lobby once you confirm", and joined on the confirming
+  press. This replaced a keyboard default that left friends arriving from an
+  invite — who never see the join screen — unable to use their pad.
+- Pressing O / Y on the join screen only opens the online screen; it does not
+  choose the device.
+- The confirmed pad is remembered by GUID and name as well as joypad id. A pad
+  that reconnects, or that Steam Input swaps for a virtual one, comes back under
+  a new id and is re-linked automatically — mid-match too, because the online
+  roster shares the same `InputDevice` object. Two identical pads share a GUID,
+  so with both plugged in whichever reconnects first is taken.
+- If the confirmed pad is unplugged the lobby says so; the host is not blocked
+  from starting.
+- Buttons on the online screen are mouse-only (`FOCUS_NONE`). A focused button
+  is also pressed by A or Enter — the very presses that confirm — so "Change
+  controller" would otherwise re-fire on the confirming press.
+
+**A pad the game cannot see.** The online screen lists the controllers the game
+can see, and the log (`user://logs/godot.log`) records them at startup, on every
+connect/disconnect, and on each confirmation. If a pad is plugged in but the list
+says *none*, Steam Input has it: the game runs as app 480, so Steam applies
+Spacewar's controller settings. Fix it on that machine: Steam → Library →
+Spacewar → Properties → Controller → **Disable Steam Input** (or turn off that
+controller type in Steam → Settings → Controller), then restart the game.
+
 Testing notes:
 
 - App id is still **480 (Spacewar)**. Everyone needs Steam running and signed

@@ -19,6 +19,8 @@ signal lobby_changed
 signal status_changed(text: String)
 ## A client dropped. Fired on the host, so a running match can park their car.
 signal peer_left(peer_id: int)
+## The confirmed controller changed, went missing, or came back.
+signal device_changed
 
 const LOBBY_SCENE := "res://scenes/online_lobby.tscn"
 const MATCH_SCENE := "res://scenes/arena_match.tscn"
@@ -36,13 +38,38 @@ var steam_name := ""
 var lobby_id := 0
 var status := ""
 var in_match := false
-## The device this machine's player drives with. Chosen on the lobby screen.
-var local_device: InputDevice = InputDevice.keyboard()
+## The device this machine's player drives with online, or null until the player
+## confirms one on the online screen. Nothing online — hosting, joining, an
+## invite — goes ahead without it. It used to default to the keyboard, which is
+## how a friend arriving from a Steam invite (never seeing the join screen)
+## ended up unable to use their pad.
+##
+## Held as one object for the whole run: the online roster gives this same
+## instance to this machine's seat, so re-linking a reconnected pad below also
+## fixes it mid-match.
+var local_device: InputDevice = null
+## A lobby the player asked to join (invite, "Join Game", launch argument) before
+## confirming a controller. Joined the moment they confirm.
+var pending_lobby_id := 0
+## Who invited them to `pending_lobby_id`, for the prompt.
+var pending_lobby_owner := ""
+
+## Joypad ids are handed out by connection order, so a pad that reconnects — or
+## that Steam Input swaps for a virtual one — can come back under a new id. The
+## confirmed pad is also remembered by hardware GUID and name to find it again.
+var _device_guid := ""
+var _device_name := ""
 
 var _peer: SteamMultiplayerPeer = null
 
 
 func _ready() -> void:
+	# Logged whether or not Steam is up. When a friend's pad "does nothing", their
+	# log (user://logs/godot.log) shows whether the game ever saw it — usually the
+	# answer is that Steam Input hid it.
+	Input.joy_connection_changed.connect(_on_joy_connection_changed)
+	_log_controllers("at startup")
+
 	steam_ready = Steam.isSteamRunning() and Steam.getSteamID() != 0
 	if not steam_ready:
 		_set_status("Steam is not running. Start Steam, sign in, then relaunch the game.")
@@ -143,18 +170,112 @@ func can_start_match() -> bool:
 
 
 # ---------------------------------------------------------------------------
+# Controller confirmation
+# ---------------------------------------------------------------------------
+
+func has_confirmed_device() -> bool:
+	return local_device != null
+
+
+## Confirmed and currently connected. False while a confirmed pad is unplugged.
+func is_device_available() -> bool:
+	return local_device != null and local_device.is_available()
+
+
+## Called by the online screen when the player presses A (pad) or Enter
+## (keyboard). Joins a lobby that was waiting on this.
+func confirm_device(device: InputDevice) -> void:
+	if device == null:
+		return
+	if local_device == null:
+		local_device = InputDevice.keyboard()
+	# Updated in place rather than replaced: see local_device.
+	local_device.kind = device.kind
+	local_device.device_id = device.device_id
+	_device_guid = Input.get_joy_guid(device.device_id) if not device.is_keyboard() else ""
+	_device_name = Input.get_joy_name(device.device_id) if not device.is_keyboard() else ""
+	print("Controllers: confirmed %s" % local_device.display_name())
+	device_changed.emit()
+
+	if pending_lobby_id != 0:
+		var target := pending_lobby_id
+		pending_lobby_id = 0
+		pending_lobby_owner = ""
+		join_lobby(target)
+
+
+## Back to the prompt, e.g. from the lobby's Change controller button. Only
+## before a match: the seat's device is locked once the match starts.
+func clear_device() -> void:
+	if in_match:
+		return
+	local_device = null
+	_device_guid = ""
+	_device_name = ""
+	device_changed.emit()
+
+
+## Controllers the game itself can see, as "name (id)". Empty means none: if a
+## pad is plugged in anyway, something outside the game (Steam Input) has it.
+func connected_controller_names() -> PackedStringArray:
+	var names := PackedStringArray()
+	for id in Input.get_connected_joypads():
+		var pad_name := Input.get_joy_name(id)
+		names.append("%s (%d)" % [pad_name if not pad_name.is_empty() else "Gamepad", id])
+	return names
+
+
+func _on_joy_connection_changed(device_id: int, connected: bool) -> void:
+	print("Controllers: pad %d %s (%s)" % [
+		device_id, "connected" if connected else "disconnected", Input.get_joy_name(device_id)
+	])
+	_log_controllers("now")
+
+	if local_device == null or local_device.is_keyboard():
+		return
+	if not connected and device_id == local_device.device_id:
+		print("Controllers: your confirmed controller disconnected")
+		device_changed.emit()
+	elif connected and not local_device.is_available() and _is_confirmed_pad(device_id):
+		# Same controller back under a new id. Two identical pads share a GUID,
+		# so with one of each plugged in this takes whichever reconnects first.
+		local_device.device_id = device_id
+		print("Controllers: your controller reconnected as pad %d" % device_id)
+		device_changed.emit()
+
+
+func _is_confirmed_pad(device_id: int) -> bool:
+	if _device_guid.is_empty():
+		return false
+	return Input.get_joy_guid(device_id) == _device_guid and Input.get_joy_name(device_id) == _device_name
+
+
+func _log_controllers(when: String) -> void:
+	var names := connected_controller_names()
+	print("Controllers %s: %s" % [when, ", ".join(names) if not names.is_empty() else "none"])
+
+
+# ---------------------------------------------------------------------------
 # Lobby lifecycle
 # ---------------------------------------------------------------------------
 
 func host_lobby() -> void:
-	if not _require_steam() or lobby_id != 0:
+	if not _require_device() or not _require_steam() or lobby_id != 0:
 		return
 	_set_status("Creating lobby...")
 	Steam.createLobby(Steam.LOBBY_TYPE_FRIENDS_ONLY, MAX_MEMBERS)
 
 
 func join_lobby(target_lobby_id: int) -> void:
-	if not _require_steam() or target_lobby_id == 0 or target_lobby_id == lobby_id:
+	if target_lobby_id == 0 or target_lobby_id == lobby_id:
+		return
+	if not has_confirmed_device():
+		# Held, not dropped: confirming a controller joins it.
+		pending_lobby_id = target_lobby_id
+		_set_status("Press A on the controller you'll play with (or Enter for the keyboard) to join.")
+		lobby_changed.emit()
+		return
+	if not _require_steam():
 		return
 	if lobby_id != 0:
 		leave_lobby()
@@ -163,6 +284,8 @@ func join_lobby(target_lobby_id: int) -> void:
 
 
 func leave_lobby() -> void:
+	pending_lobby_id = 0
+	pending_lobby_owner = ""
 	_close_peer()
 	if lobby_id != 0:
 		Steam.leaveLobby(lobby_id)
@@ -208,7 +331,10 @@ func return_to_lobby() -> void:
 
 @rpc("authority", "call_local", "reliable")
 func _rpc_start_match(entries: Array) -> void:
-	PlayerRoster.set_online_roster(entries, multiplayer.get_unique_id(), local_device)
+	# Hosting and joining both require a confirmed device, so this fallback only
+	# guards against a device cleared at the worst moment.
+	var device := local_device if local_device != null else InputDevice.keyboard()
+	PlayerRoster.set_online_roster(entries, multiplayer.get_unique_id(), device)
 	in_match = true
 	get_tree().change_scene_to_file(MATCH_SCENE)
 
@@ -280,10 +406,12 @@ func _on_lobby_chat_update(_lobby: int, _changed_id: int, _making_change_id: int
 	lobby_changed.emit()
 
 
-## "Join Game" from the Steam friends list, or accepting an overlay invite.
-func _on_join_requested(requested_lobby_id: int, _friend_id: int) -> void:
+## "Join Game" from the Steam friends list, or accepting an overlay invite. Without
+## a confirmed controller this waits on the online screen's prompt (join_lobby).
+func _on_join_requested(requested_lobby_id: int, friend_id: int) -> void:
 	if in_match:
 		return
+	pending_lobby_owner = _name_for_steam_id(friend_id) if friend_id != 0 else ""
 	join_lobby(requested_lobby_id)
 	_goto_lobby_screen()
 
@@ -357,6 +485,12 @@ func _goto_lobby_screen() -> void:
 	var current := get_tree().current_scene
 	if current == null or current.scene_file_path != LOBBY_SCENE:
 		get_tree().change_scene_to_file(LOBBY_SCENE)
+
+
+func _require_device() -> bool:
+	if not has_confirmed_device():
+		_set_status("Press A on the controller you'll play with (or Enter for the keyboard) first.")
+	return has_confirmed_device()
 
 
 func _require_steam() -> bool:
