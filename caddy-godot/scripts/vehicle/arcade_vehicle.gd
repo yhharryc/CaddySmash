@@ -27,6 +27,10 @@ var has_move_intent := false
 var throttle_input := 0.0
 var brake_reverse_input := 0.0
 var grip_input := 0.0
+## The stick as the driver holds it, in world space (length 0..1), kept even
+## while control_locked zeroes move_intent. Knockback DI reads this: a staggered
+## car cannot steer, but its player is still choosing where to be launched.
+var stick_intent := Vector3.ZERO
 
 # --- Derived state ---
 var is_drifting := true
@@ -97,13 +101,17 @@ func set_move_intent(world_direction: Vector3) -> void:
 ## zone did the work instead. Same pipeline shape, one fewer dead config field.
 func set_move_intent_from_stick(stick: Vector2) -> void:
 	if stick.length() < tuning.move_intent_dead_zone:
+		stick_intent = Vector3.ZERO
 		set_move_intent(Vector3.ZERO)
 		return
 
 	var yaw: float = intent_yaw_source.global_rotation.y if intent_yaw_source != null else 0.0
 	var forward := UeMath.yaw_to_heading(yaw)
 	var right := forward.cross(Vector3.UP)
-	set_move_intent((forward * stick.y + right * stick.x).normalized())
+	var world := forward * stick.y + right * stick.x
+	# Recorded before set_move_intent, which drops it while control is locked.
+	stick_intent = world.limit_length(1.0)
+	set_move_intent(world.normalized())
 
 
 func set_throttle_input(value: float) -> void:

@@ -100,6 +100,9 @@ func _reset() -> void:
 	_vehicle.global_position = Vector3(0.0, 0.35, 0.0)
 	_vehicle.reverse_steering_active = false
 	_vehicle.set_control_lock_enabled(false)
+	# The stick-to-intent check leaves a held stick behind, and knockback DI reads
+	# it: without this, every later knockback would be launched at an angle.
+	_vehicle.stick_intent = Vector3.ZERO
 	# A check that leaves an effect mid-flight (a knockback interrupted by death,
 	# an aborted dash) would otherwise hand the next check a car that cannot drive.
 	_vehicle.set_external_velocity_control_enabled(false)
@@ -123,6 +126,7 @@ func _run() -> void:
 		"_check_brake_dash",
 		"_check_impact_adjudication",
 		"_check_combat_reactions",
+		"_check_directional_influence",
 		"_check_arena",
 		"_check_player_roster",
 		"_check_scene_wiring",
@@ -345,6 +349,105 @@ func _check_combat_reactions() -> void:
 	)
 
 	skill.queue_free()
+	combat.queue_free()
+
+
+## Smash-style DI. Uses CombatTuning's script defaults (18°, dead zone 0.3, no
+## speed influence) rather than the project .tres, so retuning DI in play does
+## not break the suite.
+func _check_directional_influence() -> void:
+	var combat := VehicleCombat.new()
+	combat.vehicle = _vehicle
+	combat.tuning = CombatTuning.new()
+	_vehicle.add_child(combat)
+
+	var impact := ImpactEvent.new()
+	impact.attacker = _target
+	impact.target = _vehicle
+	impact.tier = ImpactTier.Value.HEAVY
+	impact.apply_knockback = true
+
+	# Attacker 6 m in front (-Z), so the undirected launch is straight +Z. Returns
+	# the launch angle in degrees, positive toward +X.
+	var launch := func(stick: Vector3) -> float:
+		_reset()
+		_vehicle.global_position = Vector3.ZERO
+		_target.global_position = Vector3(0.0, 0.35, -6.0)
+		_vehicle.stick_intent = stick
+		combat.apply_reactions(impact)
+		combat._physics_process(TICK)
+		var v := _vehicle.velocity
+		var angle := rad_to_deg(atan2(v.x, v.z))
+		while combat.is_knocked_back():
+			combat._physics_process(TICK)
+		return angle
+
+	_record("DI: no stick", launch.call(Vector3.ZERO), "deg", 0.0, 0.01)
+	_record("DI: full stick across (+X)", launch.call(Vector3.RIGHT), "deg", 18.0, 0.01)
+	_record("DI: full stick across (-X)", launch.call(Vector3.LEFT), "deg", -18.0, 0.01)
+	_record("DI: stick along, away from attacker", launch.call(Vector3.BACK), "deg", 0.0, 0.01)
+	_record("DI: stick along, toward attacker", launch.call(Vector3.FORWARD), "deg", 0.0, 0.01)
+	_record("DI: half stick across", launch.call(Vector3.RIGHT * 0.5), "deg", 9.0, 0.01)
+	_record(
+		"DI: diagonal stick (45 deg off the launch)",
+		launch.call((Vector3.RIGHT + Vector3.BACK).normalized()), "deg", 18.0 * sin(PI / 4.0), 0.01
+	)
+	_record("DI: stick inside the dead zone", launch.call(Vector3.RIGHT * 0.2), "deg", 0.0, 0.01)
+
+	# Read when hitlag ends, not on contact: the freeze is the window to choose.
+	_reset()
+	_vehicle.global_position = Vector3.ZERO
+	_target.global_position = Vector3(0.0, 0.35, -6.0)
+	_vehicle.stick_intent = Vector3.RIGHT
+	HitStop.freeze_remaining = 0.2
+	combat.apply_reactions(impact)
+	combat._physics_process(TICK)
+	_expect(
+		absf(_vehicle.velocity.x) < 0.001,
+		"DI waits while the hit stop is frozen (%v)" % _vehicle.velocity
+	)
+	HitStop.freeze_remaining = 0.0
+	combat._physics_process(TICK)
+	_record(
+		"DI: applied once the freeze ends",
+		rad_to_deg(atan2(_vehicle.velocity.x, _vehicle.velocity.z)), "deg", 18.0, 0.01
+	)
+	# Read once: moving the stick later in the shove changes nothing.
+	_vehicle.stick_intent = Vector3.LEFT
+	combat._physics_process(TICK)
+	_record(
+		"DI: read once, not steered mid-shove",
+		rad_to_deg(atan2(_vehicle.velocity.x, _vehicle.velocity.z)), "deg", 18.0, 0.01
+	)
+	while combat.is_knocked_back():
+		combat._physics_process(TICK)
+	HitStop.cancel()
+
+	# Launch speed influence, when turned on.
+	combat.tuning.knockback_di_speed_scale = 0.15
+	var speed := func(stick: Vector3) -> float:
+		_reset()
+		_vehicle.global_position = Vector3.ZERO
+		_target.global_position = Vector3(0.0, 0.35, -6.0)
+		_vehicle.stick_intent = stick
+		combat.apply_reactions(impact)
+		combat._physics_process(TICK)
+		var s := _vehicle.get_planar_speed()
+		while combat.is_knocked_back():
+			combat._physics_process(TICK)
+		return s
+	_record("DI speed: held away from the attacker", speed.call(Vector3.BACK), "m/s", 13.2 * 1.15, 0.001)
+	_record("DI speed: held toward the attacker", speed.call(Vector3.FORWARD), "m/s", 13.2 * 0.85, 0.001)
+	_record("DI speed: held across", speed.call(Vector3.RIGHT), "m/s", 13.2, 0.001)
+
+	# A staggered car's controls are locked, but its stick still counts for DI.
+	_reset()
+	_vehicle.set_control_lock_enabled(true)
+	_vehicle.set_move_intent_from_stick(Vector2(1.0, 0.0))
+	_expect(not _vehicle.has_move_intent, "a locked car takes no steering intent")
+	_record("locked car still records the stick for DI", _vehicle.stick_intent.x, "", 1.0, 0.001)
+	_reset()
+
 	combat.queue_free()
 
 

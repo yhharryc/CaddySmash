@@ -95,6 +95,7 @@ func _ready() -> void:
 		for slot_index in match_manager.combats:
 			var combat: VehicleCombat = match_manager.combats[slot_index]
 			combat.damage_taken.connect(_on_damage_taken.bind(combat))
+			combat.knockback_redirected.connect(_on_knockback_redirected.bind(slot_index))
 		_ready_peers[1] = true
 		_try_start()
 	else:
@@ -527,6 +528,29 @@ func _rpc_impact(
 	impact.apply_knockback = knockback
 	impact.apply_stagger = stagger
 	combat.apply_reactions(impact)
+
+
+## Host: a car's knockback was re-aimed by DI. Sent to everyone; only the owner
+## acts on it (puppets follow the snapshots).
+func _on_knockback_redirected(
+	direction: Vector3, hold_speed: float, carry_speed: float, slot_index: int
+) -> void:
+	_rpc_knockback_redirected.rpc(slot_index, direction, hold_speed, carry_speed)
+
+
+## The owner already applied DI from its own stick so the launch responds at
+## once; the host's answer, from the input it received, replaces it. They
+## usually match — the stick is held through hitlag — and if not, the host wins
+## here rather than through a position correction a few frames later.
+@rpc("authority", "call_remote", "reliable")
+func _rpc_knockback_redirected(
+	slot_index: int, direction: Vector3, hold_speed: float, carry_speed: float
+) -> void:
+	if slot_index != local_slot_index:
+		return
+	var combat: VehicleCombat = match_manager.combats.get(slot_index)
+	if combat != null:
+		combat.override_knockback(direction, hold_speed, carry_speed)
 
 
 ## Replays the host's contest locally so hit stop, shake, deformation and the

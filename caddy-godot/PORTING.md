@@ -280,6 +280,31 @@ impact flash combines by taking whichever of the two is stronger, so a hit alway
 reads and momentum never masks it. On resolution the shockwave takes the winner's
 player colour, and a CLASH gets the heaviest freeze in the game.
 
+### Knockback and directional influence
+
+The loser of a contest (both cars on a CLASH) is shoved straight away from the
+attacker, centre to centre, at the tier's `*_knockback_speed` for
+`*_knockback_duration`, then left rolling at `speed × *_knockback_carry`.
+
+The hit player bends that launch with **Smash Bros-style DI**
+(`VehicleCombat._apply_directional_influence`):
+
+- Only the stick's component **across** the launch counts: it rotates the
+  launch toward the stick by up to `knockback_di_max_angle_deg` (18°, Smash's
+  value). Holding along the launch, toward or away, rotates nothing. A stick
+  under `knockback_di_dead_zone` (0.3) is ignored.
+- It is read **once, when hitlag ends** — the first tick after the hit-stop
+  freeze — not on the frame of contact, so the freeze is the window to choose.
+  Moving the stick later in the shove changes nothing.
+- Optional launch speed influence, `knockback_di_speed_scale` (default 0, off):
+  holding away launches up to that fraction farther, toward that much shorter.
+- A staggered car's controls are locked, so DI cannot read `move_intent`, which
+  the lock zeroes. `ArcadeVehicle.stick_intent` records the stick regardless.
+- Online the host's DI is authoritative: the owner applies DI from its own stick
+  for an immediate response, then the host's `knockback_redirected` result
+  replaces it via `override_knockback`. The host always announces the result,
+  even when DI changed nothing, so an owner who DI'd differently is corrected.
+
 ## Hit emphasis
 
 Three systems layered on top of the mesh deformation, all scaled by impact tier:

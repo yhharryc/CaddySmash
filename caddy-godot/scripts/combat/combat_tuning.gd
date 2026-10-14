@@ -36,6 +36,18 @@ extends Resource
 ## UE HeavyKnockback.CarryVelocityRatio 0.20.
 @export var heavy_knockback_carry: float = 0.2
 
+@export_group("Knockback - Directional influence")
+## Smash Bros-style DI. Holding the stick across the launch rotates it toward the
+## stick by up to this many degrees; holding along it rotates nothing. Smash uses
+## 18. 0 turns DI off.
+@export_range(0.0, 90.0) var knockback_di_max_angle_deg: float = 18.0
+## How far the stick must be pushed (0..1) before it counts as DI.
+@export_range(0.0, 1.0) var knockback_di_dead_zone: float = 0.3
+## Launch speed influence: holding away from the attacker launches up to this
+## much farther, holding toward it this much shorter (0.15 = ±15%). 0 is pure
+## Smash DI, which changes the angle only.
+@export_range(0.0, 0.5) var knockback_di_speed_scale: float = 0.0
+
 @export_group("Stagger - Light")
 ## UE LightTier.DurationSeconds 0.35.
 @export var light_stagger_duration: float = 0.35
