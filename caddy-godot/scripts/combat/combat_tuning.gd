@@ -36,6 +36,14 @@ extends Resource
 ## UE HeavyKnockback.CarryVelocityRatio 0.20.
 @export var heavy_knockback_carry: float = 0.2
 
+@export_group("Knockback - Attacker momentum")
+## How much the attacker's direction of travel bends the launch, which is
+## otherwise straight away from the attacker's centre. 0 is exactly that, and
+## skips the blend entirely. Scaled by the attacker's speed against its top
+## speed, so a slow nudge barely drags. At 0.35 a full-speed 90° sideswipe
+## launches ~28° along the attacker's path. Applied before DI.
+@export_range(0.0, 1.0) var knockback_momentum_blend: float = 0.35
+
 @export_group("Knockback - Directional influence")
 ## Smash Bros-style DI. Holding the stick across the launch rotates it toward the
 ## stick by up to this many degrees; holding along it rotates nothing. Smash uses

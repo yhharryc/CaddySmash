@@ -282,11 +282,25 @@ player colour, and a CLASH gets the heaviest freeze in the game.
 
 ### Knockback and directional influence
 
-The loser of a contest (both cars on a CLASH) is shoved straight away from the
-attacker, centre to centre, at the tier's `*_knockback_speed` for
-`*_knockback_duration`, then left rolling at `speed × *_knockback_carry`.
+The loser of a contest (both cars on a CLASH) is shoved away from the attacker,
+centre to centre, at the tier's `*_knockback_speed` for `*_knockback_duration`,
+then left rolling at `speed × *_knockback_carry`.
 
-The hit player bends that launch with **Smash Bros-style DI**
+**Attacker momentum** bends that direction along the attacker's path
+(`VehicleCombat._blend_attacker_momentum`):
+`direction = (1 − w) × away + w × path`, with
+`w = knockback_momentum_blend × (attacker speed ÷ its top speed)`.
+
+- Only angled hits change. Head-on and rear-end hits are untouched, since the
+  attacker's path already points away. A full-speed 90° sideswipe at the
+  default 0.35 launches ~28° along the attacker's path; at half speed, ~12°.
+- It never pulls the car toward the attacker: any part of the attacker's travel
+  pointing back at it (reversing away, passing the far side) is dropped.
+- The attacker's velocity is ClashArbiter's frame-start snapshot, taken before
+  the collision rewrote it.
+- 0 skips the blend entirely — the launch is exactly centre to centre.
+
+The hit player then bends the result with **Smash Bros-style DI**
 (`VehicleCombat._apply_directional_influence`):
 
 - Only the stick's component **across** the launch counts: it rotates the

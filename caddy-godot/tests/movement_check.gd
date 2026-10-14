@@ -127,6 +127,7 @@ func _run() -> void:
 		"_check_impact_adjudication",
 		"_check_combat_reactions",
 		"_check_directional_influence",
+		"_check_knockback_momentum",
 		"_check_arena",
 		"_check_player_roster",
 		"_check_scene_wiring",
@@ -359,6 +360,8 @@ func _check_directional_influence() -> void:
 	var combat := VehicleCombat.new()
 	combat.vehicle = _vehicle
 	combat.tuning = CombatTuning.new()
+	# DI alone: the attacker-momentum blend has its own check.
+	combat.tuning.knockback_momentum_blend = 0.0
 	_vehicle.add_child(combat)
 
 	var impact := ImpactEvent.new()
@@ -448,6 +451,84 @@ func _check_directional_influence() -> void:
 	_record("locked car still records the stick for DI", _vehicle.stick_intent.x, "", 1.0, 0.001)
 	_reset()
 
+	combat.queue_free()
+
+
+## Attacker-momentum blend. Uses CombatTuning's script default (0.35) so retuning
+## it in play does not break the suite. The hit car sits at the origin with the
+## attacker 6 m in front (-Z): straight away is +Z, and angles are toward +X.
+func _check_knockback_momentum() -> void:
+	var combat := VehicleCombat.new()
+	combat.vehicle = _vehicle
+	combat.tuning = CombatTuning.new()
+	_vehicle.add_child(combat)
+	var top_speed := _target.get_max_speed()
+
+	var impact := ImpactEvent.new()
+	impact.attacker = _target
+	impact.target = _vehicle
+	impact.tier = ImpactTier.Value.HEAVY
+	impact.apply_knockback = true
+
+	var launch := func(attacker_velocity: Vector3, stick: Vector3 = Vector3.ZERO) -> float:
+		_reset()
+		_vehicle.global_position = Vector3.ZERO
+		_target.global_position = Vector3(0.0, 0.35, -6.0)
+		_target.velocity = attacker_velocity
+		# The suite steps physics by hand, so ClashArbiter's frame-start snapshot
+		# still holds the target's velocity from a real frame long ago. Drop it so
+		# the arbiter falls back to the velocity set above.
+		ClashArbiter._snapshot.erase(_target.get_instance_id())
+		_vehicle.stick_intent = stick
+		combat.apply_reactions(impact)
+		combat._physics_process(TICK)
+		var v := _vehicle.velocity
+		var angle := rad_to_deg(atan2(v.x, v.z))
+		while combat.is_knocked_back():
+			combat._physics_process(TICK)
+		return angle
+
+	var blend := combat.tuning.knockback_momentum_blend
+	_record("momentum: stationary attacker", launch.call(Vector3.ZERO), "deg", 0.0, 0.01)
+	_record(
+		"momentum: full-speed 90 deg sideswipe",
+		launch.call(Vector3.RIGHT * top_speed), "deg", rad_to_deg(atan(blend / (1.0 - blend))), 0.01
+	)
+	var half := blend * 0.5
+	_record(
+		"momentum: half-speed sideswipe",
+		launch.call(Vector3.RIGHT * top_speed * 0.5), "deg", rad_to_deg(atan(half / (1.0 - half))), 0.01
+	)
+	_record("momentum: head-on (path already points away)", launch.call(Vector3.BACK * top_speed), "deg", 0.0, 0.01)
+	_record(
+		"momentum: attacker reversing away never pulls the car back",
+		launch.call(Vector3.FORWARD * top_speed), "deg", 0.0, 0.01
+	)
+	_expect(_vehicle.velocity.z >= 0.0, "momentum never launches the car toward the attacker")
+	# Travelling diagonally away (+X, -Z): only the sideways half of the path counts.
+	var sideways := blend * sqrt(0.5)
+	_record(
+		"momentum: diagonal-away path keeps only its sideways share",
+		launch.call((Vector3.RIGHT + Vector3.FORWARD).normalized() * top_speed), "deg",
+		rad_to_deg(atan(sideways / (1.0 - blend))), 0.01
+	)
+	# Applied before DI, so DI rotates the blended launch. The stick (+X) is no
+	# longer square to that launch, so DI adds max_angle * cos(blended angle).
+	var blended := rad_to_deg(atan(blend / (1.0 - blend)))
+	_record(
+		"momentum then DI: sideswipe plus stick toward +X",
+		launch.call(Vector3.RIGHT * top_speed, Vector3.RIGHT), "deg",
+		blended + combat.tuning.knockback_di_max_angle_deg * cos(deg_to_rad(blended)), 0.01
+	)
+
+	combat.tuning.knockback_momentum_blend = 0.0
+	_record(
+		"momentum: blend 0 leaves the launch straight away",
+		launch.call(Vector3.RIGHT * top_speed), "deg", 0.0, 0.001
+	)
+
+	_target.velocity = Vector3.ZERO
+	_reset()
 	combat.queue_free()
 
 
@@ -762,7 +843,7 @@ func _check_reverse_steering_latch() -> void:
 	_reset()
 	_expect(not _vehicle.reverse_steering_active, "latch starts off")
 
-	# Braking from rest accelerates backwards at 36 m/s^2, so a single tick is
+	# Braking from rest accelerates backwards at 40 m/s^2, so a single tick is
 	# all the room there is below the 1.2 m/s enter speed.
 	_drive(TICK, 0.0, 1.0, Vector3.FORWARD)
 	_expect(
@@ -778,10 +859,11 @@ func _check_reverse_steering_latch() -> void:
 		_vehicle.reverse_steering_active,
 		"latch must arm once reversing past enter speed (rev %.2f)" % -_vehicle.get_forward_speed()
 	)
-	_record("reverse top speed", absf(_vehicle.get_forward_speed()), "m/s", 9.2, 0.05)
+	_record("reverse top speed", absf(_vehicle.get_forward_speed()), "m/s", 22.0, 0.05)
 
-	# Coasting back toward the exit speed (0.7) releases it.
-	_drive(0.5, 0.0, 0.0, Vector3.FORWARD)
+	# Coasting back toward the exit speed (0.7) releases it. From 22 m/s at the
+	# 26 m/s^2 coast that takes ~0.8 s, so allow a full second.
+	_drive(1.0, 0.0, 0.0, Vector3.FORWARD)
 	_expect(
 		not _vehicle.reverse_steering_active,
 		"latch must release below exit speed (rev %.2f)" % -_vehicle.get_forward_speed()

@@ -240,14 +240,47 @@ func _finish_knockback() -> void:
 	knockback_ended.emit(_knockback_carry_speed)
 
 
-## Shoved away from the attacker, falling back to straight backwards.
+## Shoved away from the attacker, bent along the attacker's path by
+## knockback_momentum_blend, falling back to straight backwards.
 func _resolve_knockback_direction(impact: ImpactEvent) -> Vector3:
 	if impact.attacker != null:
 		var away := vehicle.global_position - impact.attacker.global_position
 		away.y = 0.0
 		if not away.is_zero_approx():
-			return away.normalized()
+			return _blend_attacker_momentum(away.normalized(), impact.attacker)
 	return -vehicle.planar_forward()
+
+
+## Mixes the attacker's direction of travel into `away`, so a sideswipe carries
+## the hit car along the attacker's path instead of straight out sideways. Head-
+## on and rear-end hits are untouched: there the path already points away.
+##
+## Velocity comes from ClashArbiter's frame-start snapshot, taken before either
+## car moved, so the collision itself (which rewrites the attacker's velocity)
+## cannot distort it.
+func _blend_attacker_momentum(away: Vector3, attacker: ArcadeVehicle) -> Vector3:
+	var blend := clampf(tuning.knockback_momentum_blend, 0.0, 1.0)
+	if blend <= 0.0:
+		return away
+
+	var travel := ClashArbiter.velocity_at_frame_start(attacker)
+	travel.y = 0.0
+	var speed := travel.length()
+	if speed < 0.01:
+		return away
+
+	# Never pull toward the attacker: drop any part of its travel that points back
+	# at it (reversing away, or moving past the far side). What remains is
+	# deliberately not renormalised, so only the sideways share of the path counts.
+	var path := travel / speed
+	var backward := path.dot(away)
+	if backward < 0.0:
+		path -= away * backward
+	if path.is_zero_approx():
+		return away
+
+	var weight := blend * clampf(speed / maxf(0.01, attacker.get_max_speed()), 0.0, 1.0)
+	return (away * (1.0 - weight) + path * weight).normalized()
 
 
 func _knockback_speed_for(tier: ImpactTier.Value) -> float:
