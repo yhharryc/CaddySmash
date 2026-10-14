@@ -301,19 +301,19 @@ func _check_combat_reactions() -> void:
 	while combat.is_knocked_back() and ticks < 200:
 		combat._physics_process(TICK)
 		ticks += 1
-	_record("knockback window", float(ticks) * TICK, "s", 0.45, 0.1)
+	_record("knockback window", float(ticks) * TICK, "s", 0.4, 0.1)
 	_expect(
 		not _vehicle.external_velocity_control, "knockback hands velocity control back"
 	)
-	_record("knockback carry speed", _vehicle.get_planar_speed(), "m/s", 13.2 * 0.2, 0.001)
+	_record("knockback carry speed", _vehicle.get_planar_speed(), "m/s", 13.2 * 0.18, 0.001)
 	var knockback_ticks := ticks
 
 	# Stagger keeps input locked at least until the shove ends, so control never
-	# comes back mid-knockback. With both at 0.45 s they end on the same tick.
+	# comes back mid-knockback. With both at 0.4 s they end on the same tick.
 	while combat.is_staggered() and ticks < 400:
 		combat._physics_process(TICK)
 		ticks += 1
-	_record("heavy stagger input lock", float(ticks) * TICK, "s", 0.45, 0.05)
+	_record("heavy stagger input lock", float(ticks) * TICK, "s", 0.4, 0.05)
 	_expect(ticks >= knockback_ticks, "stagger lasts at least as long as the knockback")
 	_expect(not _vehicle.control_locked, "input unlocks when the stagger ends")
 
