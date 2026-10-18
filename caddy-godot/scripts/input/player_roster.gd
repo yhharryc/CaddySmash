@@ -69,6 +69,28 @@ func prune_disconnected() -> int:
 	return removed
 
 
+## Online seating, sent by the host so every machine spawns the same lineup.
+## `entries` is [{peer_id, name}] in seat order. This machine's seat drives with
+## `local_device`; every other seat gets a NetworkInputDevice, which only the
+## host actually feeds.
+func set_online_roster(entries: Array, local_peer_id: int, local_device: InputDevice) -> void:
+	players.clear()
+	for i in mini(entries.size(), MAX_PLAYERS):
+		var entry: Dictionary = entries[i]
+		var peer_id := int(entry.get("peer_id", 0))
+		var player_name := String(entry.get("name", ""))
+		var device: InputDevice = (
+			local_device
+			if peer_id == local_peer_id
+			else NetworkInputDevice.for_peer(peer_id, player_name)
+		)
+		var slot := PlayerSlot.make(i, device)
+		slot.peer_id = peer_id
+		slot.player_name = player_name
+		players.append(slot)
+	roster_changed.emit()
+
+
 ## Falls back to a single keyboard player, so the arena scene can be run directly
 ## without going through the join screen.
 func ensure_at_least_one() -> void:

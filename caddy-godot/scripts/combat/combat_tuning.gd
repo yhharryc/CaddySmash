@@ -14,48 +14,68 @@ extends Resource
 
 @export_group("Knockback - Light")
 ## UE LightKnockback.OverrideSpeed 620 cm/s.
-@export var light_knockback_speed: float = 12.0
+@export var light_knockback_speed: float = 6.2
 ## UE LightKnockback.OverrideDuration 0.12.
-@export var light_knockback_duration: float = 0.21
+@export var light_knockback_duration: float = 0.12
 ## UE LightKnockback.CarryVelocityRatio 0.12.
-@export var light_knockback_carry: float = 0.14
+@export var light_knockback_carry: float = 0.12
 
 @export_group("Knockback - Medium")
 ## UE MediumKnockback.OverrideSpeed 950 cm/s.
-@export var medium_knockback_speed: float = 16.0
+@export var medium_knockback_speed: float = 9.5
 ## UE MediumKnockback.OverrideDuration 0.16.
-@export var medium_knockback_duration: float = 0.24
+@export var medium_knockback_duration: float = 0.16
 ## UE MediumKnockback.CarryVelocityRatio 0.16.
-@export var medium_knockback_carry: float = 0.18
+@export var medium_knockback_carry: float = 0.16
 
 @export_group("Knockback - Heavy")
 ## UE HeavyKnockback.OverrideSpeed 1320 cm/s.
-@export var heavy_knockback_speed: float = 21.0
+@export var heavy_knockback_speed: float = 13.2
 ## UE HeavyKnockback.OverrideDuration 0.22.
-@export var heavy_knockback_duration: float = 0.28
+@export var heavy_knockback_duration: float = 0.22
 ## UE HeavyKnockback.CarryVelocityRatio 0.20.
-@export var heavy_knockback_carry: float = 0.22
+@export var heavy_knockback_carry: float = 0.2
+
+@export_group("Knockback - Attacker momentum")
+## How much the attacker's direction of travel bends the launch, which is
+## otherwise straight away from the attacker's centre. 0 is exactly that, and
+## skips the blend entirely. Scaled by the attacker's speed against its top
+## speed, so a slow nudge barely drags. At 0.35 a full-speed 90° sideswipe
+## launches ~28° along the attacker's path. Applied before DI.
+@export_range(0.0, 1.0) var knockback_momentum_blend: float = 0.35
+
+@export_group("Knockback - Directional influence")
+## Smash Bros-style DI. Holding the stick across the launch rotates it toward the
+## stick by up to this many degrees; holding along it rotates nothing. Smash uses
+## 18. 0 turns DI off.
+@export_range(0.0, 90.0) var knockback_di_max_angle_deg: float = 18.0
+## How far the stick must be pushed (0..1) before it counts as DI.
+@export_range(0.0, 1.0) var knockback_di_dead_zone: float = 0.3
+## Launch speed influence: holding away from the attacker launches up to this
+## much farther, holding toward it this much shorter (0.15 = ±15%). 0 is pure
+## Smash DI, which changes the angle only.
+@export_range(0.0, 0.5) var knockback_di_speed_scale: float = 0.0
 
 @export_group("Stagger - Light")
 ## UE LightTier.DurationSeconds 0.35.
-@export var light_stagger_duration: float = 0.2
+@export var light_stagger_duration: float = 0.35
 ## UE LightTier.Spins 1. Cosmetic; consumed by the feel layer.
 @export var light_stagger_spins: int = 1
 ## UE LightTier.InputLockSeconds 0.35.
-@export var light_stagger_input_lock: float = 0.2
+@export var light_stagger_input_lock: float = 0.35
 
 @export_group("Stagger - Medium")
 ## UE MediumTier.DurationSeconds 0.55.
-@export var medium_stagger_duration: float = 0.3
+@export var medium_stagger_duration: float = 0.55
 ## UE MediumTier.Spins 2.
 @export var medium_stagger_spins: int = 2
 ## UE MediumTier.InputLockSeconds 0.55.
-@export var medium_stagger_input_lock: float = 0.3
+@export var medium_stagger_input_lock: float = 0.55
 
 @export_group("Stagger - Heavy")
 ## UE HeavyTier.DurationSeconds 0.8.
-@export var heavy_stagger_duration: float = 0.45
+@export var heavy_stagger_duration: float = 0.8
 ## UE HeavyTier.Spins 3.
 @export var heavy_stagger_spins: int = 3
 ## UE HeavyTier.InputLockSeconds 0.8.
-@export var heavy_stagger_input_lock: float = 0.45
+@export var heavy_stagger_input_lock: float = 0.8

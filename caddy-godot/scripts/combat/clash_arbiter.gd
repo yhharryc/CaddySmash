@@ -104,6 +104,11 @@ func report(
 ) -> void:
 	if not enabled or reporter == null or other == null or reporter == other:
 		return
+	# Online, only the host scores contests and broadcasts the result. A client
+	# scoring its own copy would deal the damage twice and disagree with the host.
+	# Offline the default peer counts as the server, so this never trips.
+	if not multiplayer.is_server():
+		return
 
 	var key := pair_key(reporter, other)
 	if _resolved_this_frame.has(key) or _pair_cooldowns.has(key):

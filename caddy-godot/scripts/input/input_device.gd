@@ -13,6 +13,8 @@ extends RefCounted
 enum Kind {
 	KEYBOARD,
 	GAMEPAD,
+	## A player on another machine. See NetworkInputDevice; device_id is the peer id.
+	NETWORK,
 }
 
 ## Radial dead zone for stick input, matching VehicleTuning.move_intent_dead_zone.
@@ -111,7 +113,7 @@ func get_brake() -> float:
 ## 0 is the car's default drifty state, 1 is full grip.
 func get_grip() -> float:
 	if is_keyboard():
-		return 1.0 if Input.is_physical_key_pressed(KEY_CTRL) else 0.0
+		return 1.0 if Input.is_physical_key_pressed(KEY_J) else 0.0
 	return 1.0 if Input.is_joy_button_pressed(device_id, JOY_BUTTON_LEFT_SHOULDER) else 0.0
 
 
@@ -142,6 +144,13 @@ func is_start_pressed() -> bool:
 	if is_keyboard():
 		return Input.is_physical_key_pressed(KEY_SPACE)
 	return Input.is_joy_button_pressed(device_id, JOY_BUTTON_START)
+
+
+## Join screen -> online lobby: O, or the north face button (Y on an Xbox pad).
+func is_online_pressed() -> bool:
+	if is_keyboard():
+		return Input.is_physical_key_pressed(KEY_O)
+	return Input.is_joy_button_pressed(device_id, JOY_BUTTON_Y)
 
 
 func _key_axis(negative: Key, positive: Key) -> float:

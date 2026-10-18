@@ -21,6 +21,13 @@ PlayerRoster="*res://scripts/input/player_roster.gd"
 HitStop="*res://scripts/fx/hit_stop.gd"
 ClashArbiter="*res://scripts/combat/clash_arbiter.gd"
 WindowMode="*res://scripts/debug/window_mode.gd"
+NetworkManager="*res://scripts/networking/network_manager.gd"
+TuningOverrides="*res://scripts/debug/tuning_overrides.gd"
+TuningSync="*res://scripts/networking/tuning_sync.gd"
+
+[debug]
+
+file_logging/enable_file_logging=true
 
 [display]
 
@@ -29,6 +36,10 @@ window/size/viewport_height=1080
 window/size/mode=3
 window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
+
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/godotsteam/plugin.cfg")
 
 [input]
 
@@ -65,3 +76,9 @@ caddy_reset={
 [rendering]
 
 rendering_device/driver.windows="d3d12"
+
+[steam]
+
+initialization/app_data/app_id=480
+initialization/processes/initialize_on_startup=true
+initialization/processes/embed_callbacks=true

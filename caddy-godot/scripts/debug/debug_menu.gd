@@ -7,6 +7,10 @@ extends CanvasLayer
 ## written back to their .tres, which is what the read-only version could not do.
 ##
 ## Toggle with F1.
+##
+## In an exported build Save goes to a user overrides file, loaded again at
+## startup (TuningOverrides). Online, the host's edits reach everyone and the
+## menu is view-only on clients, apart from Camera (TuningSync).
 
 const TELEMETRY_REFRESH := 0.1
 
@@ -18,9 +22,12 @@ const TELEMETRY_REFRESH := 0.1
 var _tabs: TabContainer
 var _telemetry_label: RichTextLabel
 var _status_label: Label
+var _session_label: Label
 var _save_button: Button
 var _revert_button: Button
+var _reset_button: Button
 var _confirm: ConfirmationDialog
+var _reset_confirm: ConfirmationDialog
 
 var _panels: Array[TuningPanel] = []
 var _telemetry_vehicle: ArcadeVehicle
@@ -40,6 +47,19 @@ func _ready() -> void:
 	# Deferred so the match has spawned its cars before we look for them.
 	_bind_targets.call_deferred()
 	ClashArbiter.contest_resolved.connect(_on_contest_resolved)
+	TuningSync.value_changed.connect(_on_remote_value_changed)
+	TuningSync.values_replaced.connect(_rebuild_tabs)
+	TuningOverrides.overrides_changed.connect(_refresh_status)
+
+
+## The host changed a value; show it in whichever tab edits that resource.
+func _on_remote_value_changed(resource: Resource, property: String, value: Variant) -> void:
+	for panel in _panels:
+		if panel.resource == resource:
+			panel.apply_remote(property, value)
+	if _status_label != null:
+		_status_label.text = "Host set %s → %s" % [property, str(value)]
+		_status_label.add_theme_color_override("font_color", Color(0.55, 0.8, 1.0))
 
 
 func _on_contest_resolved(
@@ -107,6 +127,12 @@ func _build_ui() -> void:
 	_status_label.add_theme_font_size_override("font_size", 12)
 	column.add_child(_status_label)
 
+	# Who owns tuning right now, and whether saved overrides are in play.
+	_session_label = Label.new()
+	_session_label.add_theme_font_size_override("font_size", 12)
+	_session_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	column.add_child(_session_label)
+
 	var buttons := HBoxContainer.new()
 	buttons.add_theme_constant_override("separation", 6)
 	column.add_child(buttons)
@@ -121,6 +147,19 @@ func _build_ui() -> void:
 	_revert_button.pressed.connect(_on_revert_pressed)
 	buttons.add_child(_revert_button)
 
+	# Everything changed from the shipped values, ready to paste back into the
+	# .tres files so a good session's numbers become the project's.
+	var copy_button := Button.new()
+	copy_button.text = "Copy changes"
+	copy_button.pressed.connect(_on_copy_pressed)
+	buttons.add_child(copy_button)
+
+	_reset_button = Button.new()
+	_reset_button.text = "Reset overrides"
+	_reset_button.pressed.connect(func() -> void: _reset_confirm.popup_centered())
+	_reset_button.visible = TuningOverrides.saves_to_user()
+	buttons.add_child(_reset_button)
+
 	_tabs = TabContainer.new()
 	_tabs.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_tabs.custom_minimum_size = Vector2(0, 520)
@@ -132,6 +171,15 @@ func _build_ui() -> void:
 	_confirm.dialog_autowrap = false
 	_confirm.confirmed.connect(_on_save_confirmed)
 	add_child(_confirm)
+
+	_reset_confirm = ConfirmationDialog.new()
+	_reset_confirm.title = "Reset saved overrides?"
+	_reset_confirm.ok_button_text = "Reset"
+	_reset_confirm.dialog_text = (
+		"Delete the saved overrides file and put tuning back to this build's shipped values?"
+	)
+	_reset_confirm.confirmed.connect(_on_reset_confirmed)
+	add_child(_reset_confirm)
 
 	_refresh_status()
 
@@ -195,6 +243,7 @@ func _on_preset_changed(tuning: VehicleTuning, _index: int) -> void:
 func _rebuild_tabs() -> void:
 	if _tabs == null:
 		return
+	var open_tab := _tabs.current_tab
 	for child in _tabs.get_children():
 		_tabs.remove_child(child)
 		child.queue_free()
@@ -202,6 +251,9 @@ func _rebuild_tabs() -> void:
 	_telemetry_label = null
 	_telemetry_momentum = null
 	_bind_targets()
+	# A host edit can rebuild the tabs mid-session; stay on the one being read.
+	if open_tab >= 0 and open_tab < _tabs.get_tab_count():
+		_tabs.current_tab = open_tab
 
 
 func _add_tuning_tab(resource: Resource, title: String) -> void:
@@ -238,6 +290,11 @@ func _resolve_vehicle() -> ArcadeVehicle:
 	if vehicle != null:
 		return vehicle
 	if match_manager != null:
+		# Online, show this machine's own car rather than player 1's.
+		var my_peer := multiplayer.get_unique_id()
+		for slot in match_manager.slots:
+			if slot.peer_id == my_peer and match_manager.vehicles.has(slot.index):
+				return match_manager.vehicles[slot.index]
 		for slot in match_manager.slots:
 			if match_manager.vehicles.has(slot.index):
 				return match_manager.vehicles[slot.index]
@@ -282,6 +339,9 @@ func _refresh_status() -> void:
 		_save_button.disabled = dirty == 0
 	if _revert_button != null:
 		_revert_button.disabled = dirty == 0
+	if _reset_button != null:
+		_reset_button.disabled = TuningOverrides.saved_count() == 0
+	_refresh_session_label()
 
 	# Mark the tab itself so a change is findable without opening every tab.
 	for i in _panels.size():
@@ -302,9 +362,12 @@ func _on_save_pressed() -> void:
 		if panel.dirty_count() > 0:
 			lines.append("%s  (%d)" % [panel.title, panel.dirty_count()])
 			lines.append(panel.describe_changes())
-	_confirm.dialog_text = (
-		"Overwrite the tuning files on disk with these values?\n\n%s" % "\n".join(lines)
+	var question := (
+		"Save these values to your overrides file? This build loads it at startup."
+		if TuningOverrides.saves_to_user()
+		else "Overwrite the tuning files on disk with these values?"
 	)
+	_confirm.dialog_text = "%s\n\n%s" % [question, "\n".join(lines)]
 	_confirm.popup_centered()
 
 
@@ -332,6 +395,39 @@ func _on_revert_pressed() -> void:
 	for panel in _panels:
 		panel.revert()
 	_refresh_status()
+
+
+func _on_copy_pressed() -> void:
+	DisplayServer.clipboard_set(TuningOverrides.describe_changes())
+	_status_label.text = "Copied every change from the shipped values to the clipboard"
+	_status_label.add_theme_color_override("font_color", Color(0.5, 0.9, 0.6))
+
+
+## Deletes the overrides file and goes back to shipped values. A client in a
+## session keeps the host's gameplay values and only resets its own camera.
+func _on_reset_confirmed() -> void:
+	TuningOverrides.clear_saved()
+	TuningOverrides.restore_shipped(not TuningSync.is_client())
+	TuningSync.broadcast_snapshot()
+	_rebuild_tabs()
+	_status_label.text = "Overrides cleared; back to shipped values"
+	_status_label.add_theme_color_override("font_color", Color(0.5, 0.9, 0.6))
+
+
+func _refresh_session_label() -> void:
+	if _session_label == null:
+		return
+	var parts := PackedStringArray()
+	if TuningSync.is_client():
+		parts.append("View only: the host controls tuning. The Camera tab is still yours.")
+	elif NetworkManager.is_host():
+		parts.append("Hosting: your edits are sent to every player.")
+	var saved := TuningOverrides.saved_count()
+	if saved > 0:
+		parts.append("%d saved override%s active." % [saved, "" if saved == 1 else "s"])
+	_session_label.text = "  ".join(parts)
+	_session_label.add_theme_color_override("font_color", Color(0.55, 0.8, 1.0))
+	_session_label.visible = not parts.is_empty()
 
 
 # ---------------------------------------------------------------------------

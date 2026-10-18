@@ -108,5 +108,14 @@ func apply_input(input: VehicleInput) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	# Not marked handled: with several drivers in the scene, consuming the event
 	# here would reset only the first one.
-	if vehicle != null and handles_reset and event.is_action_pressed("caddy_reset"):
+	# handles_reset is cleared by MatchManager, which resets the whole field
+	# instead; this path is for scenes without one. Online, only the host
+	# respawns — clients snap to it through the snapshots. Offline there is no
+	# peer, so is_server() is true and this still fires.
+	if (
+		vehicle != null
+		and handles_reset
+		and multiplayer.is_server()
+		and event.is_action_pressed("caddy_reset")
+	):
 		respawn()

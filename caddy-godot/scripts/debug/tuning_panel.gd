@@ -10,6 +10,9 @@ extends VBoxContainer
 ## Anything differing from the last saved state is marked dirty: bold, and
 ## recoloured. That is the whole point of the panel — knowing at a glance which
 ## numbers you have moved away from what is on disk.
+##
+## Online, edits go out to the other machines through TuningSync, and on a client
+## the controls are read-only (the host owns tuning) apart from the Camera tab.
 
 ## Colour for a value that has been tweaked but not saved.
 const DIRTY_COLOR := Color(1.0, 0.72, 0.2)
@@ -27,12 +30,18 @@ var _baseline: Dictionary = {}
 var _labels: Dictionary = {}
 ## Property names currently differing from baseline.
 var _dirty: Dictionary = {}
+## Property name -> its editor control, so values from the host can be shown.
+var _editors: Dictionary = {}
+## Set while a widget is being updated from code, so the change it fires is not
+## mistaken for the user editing it.
+var _updating_widget := false
 
 
 func setup(target: Resource, panel_title: String) -> void:
 	resource = target
 	title = panel_title
 	name = panel_title
+	TuningOverrides.register(target)
 	add_theme_constant_override("separation", 2)
 	_build()
 
@@ -58,10 +67,20 @@ func describe_changes() -> String:
 	return "\n".join(lines)
 
 
+func is_editable() -> bool:
+	return TuningSync.can_edit(resource)
+
+
+## In the editor this writes the .tres. In an exported build res:// is
+## read-only, so it goes to the user overrides file instead.
 func save() -> Error:
 	if resource == null or resource.resource_path.is_empty():
 		return ERR_FILE_BAD_PATH
-	var result := ResourceSaver.save(resource, resource.resource_path)
+	var result: Error
+	if TuningOverrides.saves_to_user():
+		result = TuningOverrides.save_resource(resource)
+	else:
+		result = ResourceSaver.save(resource, resource.resource_path)
 	if result == OK:
 		for property in _dirty.keys():
 			_baseline[property] = resource.get(property)
@@ -74,10 +93,23 @@ func save() -> Error:
 func revert() -> void:
 	for property in _dirty.keys():
 		resource.set(property, _baseline[property])
+		TuningSync.notify_local_edit(resource, property, _baseline[property])
 	_dirty.clear()
 	_refresh_widgets()
 	_restyle_all()
 	dirty_changed.emit(self, 0)
+
+
+## A value the host set. Shown, and taken as the new baseline: a client cannot
+## save or revert the host's tuning, so it should never read as an unsaved edit.
+func apply_remote(property_name: String, value) -> void:
+	if not _editors.has(property_name):
+		return
+	_baseline[property_name] = value
+	_dirty.erase(property_name)
+	_set_widget(property_name, value)
+	_style_label(property_name)
+	dirty_changed.emit(self, _dirty.size())
 
 
 func _build() -> void:
@@ -133,11 +165,24 @@ func _add_row(property_name: String, editor: Control) -> void:
 	row.add_child(label)
 
 	editor.custom_minimum_size = Vector2(120, 0)
+	if not is_editable():
+		_lock(editor)
 	row.add_child(editor)
 
 	add_child(row)
 	_labels[property_name] = label
+	_editors[property_name] = editor
 	_style_label(property_name)
+
+
+## Read-only on an online client: the host owns tuning.
+func _lock(editor: Control) -> void:
+	if editor is SpinBox:
+		(editor as SpinBox).editable = false
+	elif editor is BaseButton:
+		# CheckBox, OptionButton and ColorPickerButton are all buttons.
+		(editor as BaseButton).disabled = true
+	editor.tooltip_text = "The host controls tuning in an online match."
 
 
 func _make_editor(property: Dictionary, property_name: String) -> Control:
@@ -204,7 +249,10 @@ func _make_editor(property: Dictionary, property_name: String) -> Control:
 
 
 func _on_edited(property_name: String, value) -> void:
+	if _updating_widget:
+		return
 	resource.set(property_name, value)
+	TuningSync.notify_local_edit(resource, property_name, value)
 	var is_dirty := not _values_equal(value, _baseline.get(property_name))
 	if is_dirty:
 		_dirty[property_name] = true
@@ -240,7 +288,25 @@ func _refresh_widgets() -> void:
 		remove_child(child)
 		child.queue_free()
 	_labels.clear()
+	_editors.clear()
 	_build()
+
+
+## Shows a value in its control without that counting as a user edit.
+func _set_widget(property_name: String, value) -> void:
+	var editor: Control = _editors.get(property_name)
+	if editor == null:
+		return
+	_updating_widget = true
+	if editor is CheckBox:
+		(editor as CheckBox).button_pressed = bool(value)
+	elif editor is OptionButton:
+		(editor as OptionButton).selected = int(value)
+	elif editor is SpinBox:
+		(editor as SpinBox).value = float(value)
+	elif editor is ColorPickerButton:
+		(editor as ColorPickerButton).color = value
+	_updating_widget = false
 
 
 func _values_equal(a, b) -> bool:

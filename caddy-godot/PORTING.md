@@ -40,7 +40,7 @@ players claim a seat, one per device, then any of them starts the match.
 | Accelerate | Shift | RT, A |
 | Brake / reverse | Q | LT, B |
 | Brake-dash (hold to charge, release to fire) | Space | X |
-| Grip (tuning aid) | Ctrl | LB |
+| Grip (tuning aid) | J | LB |
 | Debug menu | F1 | |
 | Next / previous handling preset | F2 / F3 | |
 | Toggle fullscreen | F11 / Alt+Enter | |
@@ -110,6 +110,89 @@ lateral roll included, which is what `test_track.tscn` uses.
 
 Keyboard accelerate is **Shift only**: the dash took Space, and the two cannot
 share a key.
+
+## Online multiplayer (Steam)
+
+Press **Y / O** on the join screen to open `scenes/online_lobby.tscn`. Host
+creates a friends-only Steam lobby; friends join through an overlay invite,
+"Join Game" on the Steam friends list, the lobby's "Friends playing" button, or
+by pasting the lobby code. The host presses **Start match**; **Backspace** (host)
+takes everyone back to the lobby. Everything lives in `scripts/networking/`.
+
+Transport is GodotSteam's built-in `SteamMultiplayerPeer`, bound to the lobby
+with `host_with_lobby` / `connect_to_lobby`. Traffic rides Steam Datagram
+Relay, so there is no port forwarding and no NAT setup. `no_nagle` is on so a
+small packet goes out the tick it is written instead of being batched.
+
+**Host-authoritative with client-side prediction** (`net_match_sync.gd`):
+
+- The host simulates every car. Remote cars are driven through the ordinary
+  `PlayerVehicleDriver`, fed by a `NetworkInputDevice` that holds the owner's
+  newest input frame, so nothing on the vehicle side knows about the network.
+- The host sends a snapshot of every car each physics tick (60 Hz, ~50 bytes
+  per car, packed floats, unreliable).
+- **Your own car is predicted**: it simulates locally from your input the same
+  tick you press it. Each snapshot carries the input tick the host last
+  consumed for you; the client compares the host's state with its own recorded
+  state for that tick and eases the difference out (`correction_rate`), or
+  snaps past `snap_distance`. History newer than the ack is shifted by the same
+  correction, or the next snapshot would correct the same error twice.
+- **Everyone else's car is a puppet**: simulation off, drawn
+  `interpolation_delay_ticks` (3, ~50 ms) behind the newest snapshot, coasting
+  on velocity for up to `extrapolation_limit_ticks` when packets stop.
+- **Only the host scores.** `ClashArbiter.report` returns early when
+  `multiplayer.is_server()` is false. Offline the default peer counts as the
+  server, so the couch game and every test are unaffected. The host broadcasts
+  contests (clients re-emit `contest_resolved`, so `ImpactFx` plays hit stop,
+  shake and shockwave exactly as offline), impacts (the owning client replays
+  knockback and stagger on its predicted car via `VehicleCombat.apply_reactions`)
+  and eliminations. Health comes from the snapshots through
+  `set_network_health`, which never emits `destroyed`.
+- Nobody drives until every machine has loaded the arena, or 10 s pass.
+
+**Confirm a controller first.** The online screen opens on a prompt: press **A**
+on the pad you'll play with, or **Enter** for the keyboard. Host, Join, the
+lobby-code box and the Friends-playing buttons stay disabled until then. That
+device — and only that device — drives this machine's car. **Change controller**
+redoes it any time before the match starts; the choice is kept for the rest of
+the run, so it is one press per launch.
+
+- A Steam invite, "Join Game" from the friends list, or a `+connect_lobby`
+  launch that arrives before confirming is **held** (`pending_lobby_id`), shown
+  as "Joining <name>'s lobby once you confirm", and joined on the confirming
+  press. This replaced a keyboard default that left friends arriving from an
+  invite — who never see the join screen — unable to use their pad.
+- Pressing O / Y on the join screen only opens the online screen; it does not
+  choose the device.
+- The confirmed pad is remembered by GUID and name as well as joypad id. A pad
+  that reconnects, or that Steam Input swaps for a virtual one, comes back under
+  a new id and is re-linked automatically — mid-match too, because the online
+  roster shares the same `InputDevice` object. Two identical pads share a GUID,
+  so with both plugged in whichever reconnects first is taken.
+- If the confirmed pad is unplugged the lobby says so; the host is not blocked
+  from starting.
+- Buttons on the online screen are mouse-only (`FOCUS_NONE`). A focused button
+  is also pressed by A or Enter — the very presses that confirm — so "Change
+  controller" would otherwise re-fire on the confirming press.
+
+**A pad the game cannot see.** The online screen lists the controllers the game
+can see, and the log (`user://logs/godot.log`) records them at startup, on every
+connect/disconnect, and on each confirmation. If a pad is plugged in but the list
+says *none*, Steam Input has it: the game runs as app 480, so Steam applies
+Spacewar's controller settings. Fix it on that machine: Steam → Library →
+Spacewar → Properties → Controller → **Disable Steam Input** (or turn off that
+controller type in Steam → Settings → Controller), then restart the game.
+
+Testing notes:
+
+- App id is still **480 (Spacewar)**. Everyone needs Steam running and signed
+  in, and your friends' Steam status will say "Spacewar". Lobbies are tagged
+  `game=caddy_smash` so a stranger's Spacewar lobby is rejected.
+- Friends need an exported build of the same commit. Two copies on one PC
+  cannot test this: Steam allows one signed-in user per machine.
+- Tuning is **host-only** online: the host's debug-menu edits and F2/F3 presets
+  reach every machine, and clients are view-only. See
+  [Tuning online](#tuning-online).
 
 ## Feel layer
 
@@ -207,14 +290,58 @@ whether hits chain for free.
 
 The first measurement showed every tier was a free chain (0.32 / 0.48 / 0.67 s of
 spare time), because knockback moved the victim 0.7-3.0 m while the lock ran
-0.35-0.80 s, and 3 m is nothing at 22 m/s. **Both halves had to move**: a shorter
-lock alone still chains. Locks came down to 0.20 / 0.30 / 0.45 s and knockback up
-to 2.4 / 3.9 / 6.0 m, leaving windows of 0.09 / 0.12 / 0.18 s — combos survive but
-have to be earned.
+0.35-0.80 s, and 3 m is nothing at 22 m/s. **Both halves have to move**: a shorter
+lock alone still chains.
 
-Note the probe is a best case for the attacker: it assumes they are already at top
-speed on a straight line back. In a real exchange the arcade glide has redirected
-them too, so the practical window is tighter than the table says.
+Current values (locks 0.20 / 0.25 / 0.40 s, knockback 0.75 / 2.4 / 5.4 m) leave
+windows of **0.17 / 0.14 / 0.16 s** — roughly a quarter of what it was.
+
+Two things to know about them. The probe is a best case for the attacker: it
+assumes they are already at top speed on a straight line back, where a real
+exchange has redirected them through the arcade glide, so the practical window is
+tighter. And the window is currently **flat across tiers** rather than scaling
+with hit size — a light tap chains about as readily as a heavy slam, because
+light knockback is only 0.75 m. Worth revisiting if small hits start to feel
+cheap; re-run the probe after any change.
+
+### Knockback and directional influence
+
+The loser of a contest (both cars on a CLASH) is shoved away from the attacker,
+centre to centre, at the tier's `*_knockback_speed` for `*_knockback_duration`,
+then left rolling at `speed × *_knockback_carry`.
+
+**Attacker momentum** bends that direction along the attacker's path
+(`VehicleCombat._blend_attacker_momentum`):
+`direction = (1 − w) × away + w × path`, with
+`w = knockback_momentum_blend × (attacker speed ÷ its top speed)`.
+
+- Only angled hits change. Head-on and rear-end hits are untouched, since the
+  attacker's path already points away. A full-speed 90° sideswipe at the
+  default 0.35 launches ~28° along the attacker's path; at half speed, ~12°.
+- It never pulls the car toward the attacker: any part of the attacker's travel
+  pointing back at it (reversing away, passing the far side) is dropped.
+- The attacker's velocity is ClashArbiter's frame-start snapshot, taken before
+  the collision rewrote it.
+- 0 skips the blend entirely — the launch is exactly centre to centre.
+
+The hit player then bends the result with **Smash Bros-style DI**
+(`VehicleCombat._apply_directional_influence`):
+
+- Only the stick's component **across** the launch counts: it rotates the
+  launch toward the stick by up to `knockback_di_max_angle_deg` (18°, Smash's
+  value). Holding along the launch, toward or away, rotates nothing. A stick
+  under `knockback_di_dead_zone` (0.3) is ignored.
+- It is read **once, when hitlag ends** — the first tick after the hit-stop
+  freeze — not on the frame of contact, so the freeze is the window to choose.
+  Moving the stick later in the shove changes nothing.
+- Optional launch speed influence, `knockback_di_speed_scale` (default 0, off):
+  holding away launches up to that fraction farther, toward that much shorter.
+- A staggered car's controls are locked, so DI cannot read `move_intent`, which
+  the lock zeroes. `ArcadeVehicle.stick_intent` records the stick regardless.
+- Online the host's DI is authoritative: the owner applies DI from its own stick
+  for an immediate response, then the host's `knockback_redirected` result
+  replaces it via `override_knockback`. The host always announces the result,
+  even when DI changed nothing, so an owner who DI'd differently is corrected.
 
 ## Hit emphasis
 
@@ -278,7 +405,59 @@ that instance, so a dragged value is felt at once.
   amber, shows its previous value inline, and marks its tab with `*`.
 - **Save** — pops a confirm dialog listing every pending change as
   `property: old -> new`, then writes each changed Resource back to its `.tres`.
+  In an exported build it writes the overrides file instead (below).
 - **Revert** — restores every edited value from the baseline.
+- **Copy changes** — puts every value that differs from the shipped `.tres`
+  files on the clipboard, grouped by file, ready to paste back into them.
+- **Reset overrides** — builds only: deletes the overrides file and returns to
+  the shipped values.
+
+### Tuning in exported builds
+
+An exported build cannot write its own `.tres` files: `res://` is read-only, and
+this project's export packs it inside the `.exe` (`embed_pck=true`). So
+`scripts/debug/tuning_overrides.gd` (autoload `TuningOverrides`) saves to
+`user://tuning_overrides.cfg` — on Windows
+`%APPDATA%\Godot\app_userdata\Caddy_Godot\` — and **loads it automatically at
+startup**. Only changed values are stored, per tuning file and property.
+
+- Running from the editor, Save still writes the `.tres` files and the
+  overrides file is **never loaded**. The editor and builds share the same
+  `user://` folder, so it has to skip the file rather than just not write it;
+  otherwise a build's experiments would leak into development.
+- A build on saved overrides says so: the bottom-right handling label shows
+  "N saved tuning overrides active", and so does the F1 menu.
+- To make a session's numbers permanent: **Copy changes**, paste them into the
+  `.tres` files, commit, then **Reset overrides** in the build.
+- `TuningOverrides` loads every tuning file at startup to record its shipped
+  values before anything edits them, and keeps them referenced so the cars get
+  the same instances from the resource cache. **A new tuning `.tres` must be
+  added to `SYNCED_PATHS`** (or `LOCAL_ONLY_PATHS` for per-player settings like
+  the camera), or it will not be synced, saved as an override, or reset.
+
+### Tuning online
+
+`scripts/networking/tuning_sync.gd` (autoload `TuningSync`) keeps everyone in an
+online match on the **host's** tuning. Only the host can edit:
+
+- Every F1 edit, Revert and Reset on the host is sent to all clients (reliable
+  RPC, keyed by the tuning file's path and the property name). F2/F3 preset
+  switches are sent the same way; clients' F2/F3 do nothing.
+- When a client connects, the host sends **every** tuning value it has, not
+  just its edits, so a friend on an older build still plays the host's numbers.
+- On a client the menu is **view-only**: controls are disabled, host changes
+  appear live with "Host set … → …", and the status line says the host owns
+  tuning. The **Camera tab stays editable** — it is per-player and never synced.
+- When a client leaves the session it goes back to its own shipped values plus
+  its own saved overrides.
+
+This matters for more than fairness. Each client simulates its own car from its
+local tuning to predict it (see NetMatchSync), so a handling value it never
+received would make its prediction disagree with the host and rubber-band.
+
+The host announces preset `-1` when the cars are on the arena's own
+`tuning_default.tres` rather than one of the presets, so clients stay on that
+same file instead of switching to preset 0.
 
 Camera settings moved out of node exports into a `CameraTuning` Resource for this
 reason: node properties cannot be saved without writing the whole scene, and the
@@ -320,8 +499,9 @@ surface normal per contact — at 64 segments the normal turns 5.6° per joint.
 - GAS. No ability system, no gameplay effects, no attribute replication.
 - Feel layer (`UCaddyVehicleFeelComponent`): engine vibration, squash/stretch,
   lean, impact pulse, hit stop.
-- Networking. The Unreal build is server-authoritative with client input RPCs;
-  nothing here is replicated.
+- Unreal's replication itself. The Unreal build is server-authoritative with
+  client input RPCs; online play here takes the same shape over Steam (see
+  Online multiplayer) but is its own implementation, not a port.
 
 ## Conversions applied
 

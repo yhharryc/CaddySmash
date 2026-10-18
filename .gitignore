@@ -123,6 +123,9 @@ DerivedDataCache/*
 /caddy-godot/data_*/
 /caddy-godot/mono_crash.*.json
 
+# Temp files Windows leaves when a locked DLL is overwritten in place.
+/caddy-godot/addons/**/*.TMP
+
 # Deliberately NOT ignored:
 #   *.uid       - stable resource ids Godot 4.4+ writes next to each script.
 #                 Dropping them makes references break on other machines.
