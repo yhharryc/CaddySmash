@@ -290,6 +290,12 @@ func _perform_movement(delta: float) -> void:
 		return
 
 	velocity.y = 0.0
+	# Motion is planar, but move_and_collide's depenetration is not: started more
+	# than ~0.3 m inside another car, it pushes out vertically, a full car height
+	# (0.7 m) up onto its roof or down through the floor. Online that happens
+	# whenever a puppet, drawn in the past, is placed inside our predicted car.
+	# Nothing else ever writes y, so restore it after every move.
+	var ride_height := global_position.y
 	var remaining := velocity * delta
 	var min_step_sq := pow(tuning.stop_speed_threshold * delta, 2.0)
 
@@ -313,6 +319,7 @@ func _perform_movement(delta: float) -> void:
 			break
 		remaining = velocity * delta * remaining_ratio
 
+	global_position.y = ride_height
 	velocity.y = 0.0
 	if velocity.length_squared() <= stop_sq:
 		velocity = Vector3.ZERO
