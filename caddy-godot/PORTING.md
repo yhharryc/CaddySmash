@@ -464,7 +464,23 @@ surface normal per contact — at 64 segments the normal turns 5.6° per joint.
 | `scripts/combat/impact_tier.gd` | `EHRVehicleCollisionImpactTier` |
 | `scripts/vehicle/player_vehicle_driver.gd` | `ACaddyVehiclePawn` input half |
 | `scripts/camera/vehicle_camera_rig.gd` | `UCaddyVehicleCameraComponent` + SpringArm rig |
+| `scripts/vehicle/vehicle_feel.gd` | `UCaddyVehicleFeelComponent` — engine vibration, squash/stretch, lean, impact pulse |
+| `scripts/vehicle/feel_tuning.gd` | `FCaddyVehicleFeelConfig` |
+| `scripts/fx/hit_stop.gd` | the feel component's hit stop, rebuilt as the single owner of `Engine.time_scale` |
 | `scripts/util/ue_math.gd` | `FMath::FInterpTo` / `VInterpTo` / `FInterpConstantTo` / `InterpEaseInOut` |
+
+## New in the Godot build
+
+No Unreal counterpart; each is described in its own section above.
+
+| Godot | What it is |
+|---|---|
+| `scripts/combat/vehicle_momentum.gd`, `clash_arbiter.gd` | Momentum contest |
+| `scripts/fx/impact_fx.gd`, `impact_vfx.gd`, `drift_trail.gd` | Hit emphasis and drift trails |
+| `scripts/input/`, `scripts/ui/join_screen.gd`, `scripts/match/match_manager.gd` | Local multiplayer |
+| `scripts/networking/` | Online multiplayer and tuning sync |
+| `scripts/debug/tuning_overrides.gd`, `tuning_panel.gd` | Editable, saveable tuning in the debug menu |
+| `scripts/arena/circular_arena.gd` | Arena |
 
 ## Not ported yet
 
@@ -473,8 +489,6 @@ surface normal per contact — at 64 segments the normal turns 5.6° per joint.
   scores the hit, then calls `receive_impact` on the target's `VehicleCombat`.
   Same attacker → target flow, no tag plumbing.
 - GAS. No ability system, no gameplay effects, no attribute replication.
-- Feel layer (`UCaddyVehicleFeelComponent`): engine vibration, squash/stretch,
-  lean, impact pulse, hit stop.
 - Unreal's replication itself. The Unreal build is server-authoritative with
   client input RPCs; online play here takes the same shape over Steam (see
   Online multiplayer) but is its own implementation, not a port.
@@ -526,6 +540,14 @@ surface normal per contact — at 64 segments the normal turns 5.6° per joint.
 - `_perform_movement` uses `move_and_collide` in an explicit iteration loop, not
   `move_and_slide`. `move_and_slide` runs its own slide resolution and rewrites
   velocity, which would fight the arcade glide response.
+- **`_perform_movement` restores the car's height after every move.**
+  `move_and_collide` only sweeps in the plane, but its depenetration does not:
+  started more than ~0.3 m inside another car, it pushes out vertically by a
+  full car height (0.7 m). Online this happened to the client's own car whenever
+  a puppet, drawn in the past, was placed inside it. The car sank until only its
+  roof showed above the floor, or climbed onto the other car, and stayed there,
+  since nothing else writes y. Now a deeply overlapped car passes through
+  instead; the host still decides the hit.
 - Physics tick order is set by `process_physics_priority`: input driver `-10`,
   skill `-5`, combat `-4`, vehicle `0`. So each frame runs input → skill override
   → knockback override → movement. Reordering these desyncs effects by a frame.
