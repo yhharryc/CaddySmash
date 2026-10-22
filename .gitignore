@@ -126,6 +126,11 @@ DerivedDataCache/*
 # Temp files Windows leaves when a locked DLL is overwritten in place.
 /caddy-godot/addons/**/*.TMP
 
+# Shadow copies Godot writes when it cannot overwrite an in-use GDExtension
+# binary (a byte-identical "~name.dll" beside the real one). Created on any
+# editor run that reloads the extension, so it recurs for everyone.
+/caddy-godot/addons/**/~*
+
 # Deliberately NOT ignored:
 #   *.uid       - stable resource ids Godot 4.4+ writes next to each script.
 #                 Dropping them makes references break on other machines.

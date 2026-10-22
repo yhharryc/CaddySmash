@@ -35,6 +35,9 @@ var stick_intent := Vector3.ZERO
 # --- Derived state ---
 var is_drifting := true
 var reverse_steering_active := false
+## Seconds the car has sat at rest with the brake held. Reverse thrust waits for
+## this to pass reverse_arm_seconds, so braking to a stop actually stops.
+var _reverse_arm_timer := 0.0
 
 # --- External overrides ---
 ## While true the car keeps colliding but stops computing its own velocity.
@@ -93,6 +96,7 @@ func capture_state() -> Dictionary:
 		"grip": grip_input,
 		"drifting": is_drifting,
 		"reverse_steer": reverse_steering_active,
+		"reverse_arm": _reverse_arm_timer,
 		"external": external_velocity_control,
 		"locked": control_locked,
 		"dashing": skill_dashing,
@@ -110,6 +114,7 @@ func apply_state(state: Dictionary) -> void:
 	grip_input = state.get("grip", grip_input)
 	is_drifting = state.get("drifting", is_drifting)
 	reverse_steering_active = state.get("reverse_steer", reverse_steering_active)
+	_reverse_arm_timer = state.get("reverse_arm", _reverse_arm_timer)
 	external_velocity_control = state.get("external", external_velocity_control)
 	control_locked = state.get("locked", control_locked)
 	skill_dashing = state.get("dashing", skill_dashing)
@@ -256,9 +261,18 @@ func _update_velocity(delta: float) -> void:
 			local_forward = UeMath.finterp_constant_to(
 				local_forward, 0.0, delta, tuning.brake_deceleration * brake_reverse_input
 			)
+			_reverse_arm_timer = 0.0
 		else:
-			local_forward -= brake_reverse_input * tuning.reverse_acceleration * delta
-			local_forward = maxf(local_forward, -tuning.max_reverse_speed)
+			# Dwell before reverse engages. Without it, braking to a stop runs
+			# through zero and launches the car backwards at full speed, which
+			# reads as the car taking off in a direction you did not ask for.
+			# Existing reverse momentum is left alone, so a knockback still rolls.
+			_reverse_arm_timer += delta
+			if _reverse_arm_timer >= tuning.reverse_arm_seconds:
+				local_forward -= brake_reverse_input * tuning.reverse_acceleration * delta
+				local_forward = maxf(local_forward, -tuning.max_reverse_speed)
+	else:
+		_reverse_arm_timer = 0.0
 
 	if not has_throttle and not has_brake:
 		local_forward = UeMath.finterp_constant_to(
@@ -274,7 +288,22 @@ func _update_velocity(delta: float) -> void:
 	var lateral_friction := (
 		tuning.drift_lateral_friction if is_drifting else tuning.grip_lateral_friction
 	)
+	# Off the throttle the car should slow down whichever way it is pointing.
+	# Coast and drag only touch the forward axis, so without this a car sliding
+	# sideways had no deceleration at all and glided for seconds.
+	if not has_throttle:
+		lateral_friction = maxf(lateral_friction, tuning.off_throttle_lateral_friction)
 	local_lateral = UeMath.finterp_to(local_lateral, 0.0, delta, lateral_friction)
+
+	if has_brake:
+		# The brake scrubs sideways momentum as well. A brake that cannot stop a
+		# slide is not a brake.
+		local_lateral = UeMath.finterp_constant_to(
+			local_lateral,
+			0.0,
+			delta,
+			tuning.brake_deceleration * tuning.brake_lateral_scrub * brake_reverse_input
+		)
 
 	velocity = forward * local_forward + right * local_lateral
 	velocity.y = 0.0

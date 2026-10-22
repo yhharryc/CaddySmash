@@ -120,6 +120,7 @@ func _run() -> void:
 		"_check_acceleration_time",
 		"_check_steering_rate",
 		"_check_lateral_friction",
+		"_check_sideways_deceleration",
 		"_check_reverse_steering_latch",
 		"_check_control_lock",
 		"_check_wall_glide",
@@ -854,14 +855,71 @@ func _check_lateral_friction() -> void:
 	)
 
 
+## Measured with the throttle HELD. Drift persisting is a property of being on
+## the power; off-throttle the car is supposed to scrub sideways momentum, so
+## measuring that case would be testing the deceleration, not the drift.
+## Throttle only touches the forward axis, so it cannot skew a lateral reading.
 func _measure_slip_retention(grip: float) -> float:
 	_reset()
 	_drive(3.0, 1.0, 0.0, Vector3.FORWARD, grip)
-	# Rotate the body without touching velocity: pure lateral slip, no input.
+	# Rotate the body without touching velocity: pure lateral slip.
 	_vehicle.rotation.y = PI * 0.5
 	var initial := absf(_vehicle.get_lateral_speed())
-	_drive(18.0 * TICK, 0.0, 0.0, Vector3.ZERO, grip)
+	_drive(18.0 * TICK, 1.0, 0.0, Vector3.ZERO, grip)
 	return absf(_vehicle.get_lateral_speed()) / maxf(0.0001, initial)
+
+
+## Deceleration used to act along the nose only, so momentum pointing sideways
+## was immune to releasing the throttle and immune to the brake. A car could
+## glide sideways for seconds with no input able to stop it.
+func _check_sideways_deceleration() -> void:
+	var slide := func(throttle: float, brake: float, seconds: float) -> float:
+		_reset()
+		_drive(3.0, 1.0, 0.0, Vector3.FORWARD)
+		_vehicle.rotation.y = PI * 0.5
+		var initial := absf(_vehicle.get_lateral_speed())
+		_drive(seconds, throttle, brake, Vector3.ZERO)
+		return absf(_vehicle.get_lateral_speed()) / maxf(0.0001, initial)
+
+	var on_power: float = slide.call(1.0, 0.0, 0.3)
+	var off_power: float = slide.call(0.0, 0.0, 0.3)
+	var braking: float = slide.call(0.0, 1.0, 0.3)
+
+	_expect(
+		off_power < on_power * 0.5,
+		"releasing the throttle scrubs a sideways slide (%.1f%% left vs %.1f%% on power)"
+		% [off_power * 100.0, on_power * 100.0]
+	)
+	_expect(
+		braking < off_power,
+		"braking scrubs a slide harder than coasting (%.1f%% vs %.1f%%)"
+		% [braking * 100.0, off_power * 100.0]
+	)
+	_expect(
+		braking < 0.02,
+		"full brake nearly kills a sideways slide in 0.3s (%.1f%% left)" % (braking * 100.0)
+	)
+
+	# And braking to a stop must actually stop, not run through zero into reverse.
+	_reset()
+	_drive(3.0, 1.0, 0.0, Vector3.FORWARD)
+	_drive(0.45, 0.0, 1.0, Vector3.FORWARD)
+	_expect(
+		_vehicle.get_planar_speed() < 0.5,
+		"braking from top speed comes to rest (%.2f m/s)" % _vehicle.get_planar_speed()
+	)
+	_expect(
+		_vehicle.get_forward_speed() > -0.5,
+		"braking does not launch the car backwards through zero (%.2f m/s)"
+		% _vehicle.get_forward_speed()
+	)
+	# Holding the brake past the dwell still gives you reverse.
+	_drive(1.0, 0.0, 1.0, Vector3.FORWARD)
+	_expect(
+		_vehicle.get_forward_speed() < -1.0,
+		"holding the brake past the dwell still reverses (%.2f m/s)"
+		% _vehicle.get_forward_speed()
+	)
 
 
 func _check_reverse_steering_latch() -> void:

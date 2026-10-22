@@ -281,6 +281,34 @@ impact flash combines by taking whichever of the two is stronger, so a hit alway
 reads and momentum never masks it. On resolution the shockwave takes the winner's
 player colour, and a CLASH gets the heaviest freeze in the game.
 
+## Slowing down
+
+Deceleration used to act along the nose only: coast, brake and `linear_drag` all
+applied to the forward component, and lateral velocity's single sink was
+`lateral_friction` (2.5/s, the default drifty state). The moment velocity pointed
+sideways, **releasing the throttle did nothing and the brake did nothing** — the
+car glided sideways for over two seconds with no input able to stop it. Faithful
+to Unreal, but at 729 deg/s steering a car reaches 90 degrees off its nose in
+0.2 s, which turned a subtle bias into the dominant behaviour.
+
+Two tunables fix it without losing drift:
+
+- `off_throttle_lateral_friction` (6.0) replaces the drift value while the
+  throttle is released. Drift persists **under power**, which is the game; it
+  scrubs when you let go, which is what a player expects.
+- `brake_lateral_scrub` (0.7) applies that share of `brake_deceleration` to
+  sideways momentum. A brake that cannot stop a slide is not a brake.
+
+Separately, brake doubles as reverse, and with nothing to stop it crossing zero,
+braking to a stop ran straight through into full-speed reverse — worse since
+`max_reverse_speed` became 22. `reverse_arm_seconds` (0.25) makes the car sit at
+rest before reverse thrust engages, so "stop" means stop; holding the brake past
+the dwell still reverses. Existing reverse momentum is left alone during the
+dwell, so a knockback still rolls.
+
+`tests/coast_probe.tscn` reproduces all five cases and prints the angle between
+velocity and the nose; `_check_sideways_deceleration` guards it in the suite.
+
 ## Combat pacing
 
 `tests/combat_probe.tscn` reports, per tier, the input lock, the distance

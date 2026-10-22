@@ -51,7 +51,22 @@ extends Resource
 ## would hand out the drift bonus on every hit ever landed.
 @export var slip_for_drift_bonus: float = 5.0
 
+@export_group("Slowing down")
+## Lateral friction used while the throttle is released, replacing the drift
+## value. Deceleration otherwise only acts along the nose, so momentum pointing
+## sideways was immune to letting go of the gas and the car glided on for
+## seconds. Drift still persists under power; this only bites off-throttle.
+@export var off_throttle_lateral_friction: float = 6.0
+## Share of brake_deceleration applied to sideways momentum as well. A brake
+## that cannot stop a slide is not a brake. 0 restores the old forward-only
+## behaviour; 1 scrubs a slide as hard as it scrubs forward motion.
+@export_range(0.0, 1.0) var brake_lateral_scrub: float = 0.7
+
 @export_group("Reverse")
+## Brake doubles as reverse. Without a dwell, braking to a stop runs straight
+## through zero and accelerates backwards, so "stop" meant "reverse at full
+## speed". The car must sit at rest this long before reverse thrust engages.
+@export var reverse_arm_seconds: float = 0.25
 ## UE bEnableInputRelativeReverseSteering.
 @export var enable_input_relative_reverse_steering: bool = true
 ## UE ReverseSteeringEnterSpeed 120 cm/s.
