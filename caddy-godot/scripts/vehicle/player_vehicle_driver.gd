@@ -24,7 +24,7 @@ const _INPUT_PRIORITY := -10
 ## The grip input is a tuning aid: the car's shipping feel is the drifty resting
 ## state, and this binding exists to A/B the two friction values. The button is
 ## earmarked for another mechanic later.
-@export var enable_grip_input: bool = true
+@export var enable_grip_input: bool = false
 
 ## Assigned by the match. Defaults to the keyboard so single-car scenes just run.
 ## Left null for a car driven from the network instead of a local pad.
