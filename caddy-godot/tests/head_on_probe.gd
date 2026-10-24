@@ -107,6 +107,10 @@ func _run_exchange(label: String, reverse_order: bool) -> void:
 		# The ordering that used to decide everything.
 		first._physics_process(TICK)
 		second._physics_process(TICK)
+		# Jolt only learns where a car moved to when the physics server steps.
+		# Without a real step between ticks every sweep collides with the other
+		# car where it spawned, not where it is.
+		await get_tree().physics_frame
 
 	_log.append("")
 	_log.append("--- %s ---" % label)
@@ -140,7 +144,11 @@ func _run_exchange(label: String, reverse_order: bool) -> void:
 
 func _parts(car: ArcadeVehicle) -> Dictionary:
 	var parts := {}
+	# The probe steps everything by hand, in a chosen order; the engine's own
+	# per-frame callbacks would step each car a second time.
+	car.set_physics_process(false)
 	for child in car.get_children():
+		child.set_physics_process(false)
 		if child is VehicleCombat:
 			parts["combat"] = child
 		elif child is ImpactAdjudicator:
