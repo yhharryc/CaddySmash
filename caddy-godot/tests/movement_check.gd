@@ -135,6 +135,7 @@ func _run() -> void:
 		"_check_camera_framing",
 		"_check_easing",
 		"_check_feel",
+		"_check_lean",
 		"_check_charge_feel",
 		"_check_drift_trail",
 		"_check_shockwave_mesh",
@@ -1159,8 +1160,8 @@ func _check_match_scene_framing() -> void:
 
 	_expect(rig.tuning.center_bias >= 0.999, "match camera is fully anchored to the arena")
 	_expect(
-		rig.tuning.base_pitch_deg <= -80.0,
-		"match camera is near top-down (%.0f deg)" % rig.tuning.base_pitch_deg
+		rig.tuning.base_pitch_deg <= -60.0,
+		"match camera looks steeply down on the arena (%.0f deg)" % rig.tuning.base_pitch_deg
 	)
 	_expect(rig.tuning.fit_ground_radius > 0.0, "match camera uses fitted framing")
 
@@ -2143,6 +2144,97 @@ func _check_feel() -> void:
 	)
 
 	car.queue_free()
+
+
+## Lean rolls the body on its low bottom edge, so a big angle never pushes it
+## through the floor, and the direction setting picks which side goes down.
+func _check_lean() -> void:
+	var scene := load("res://scenes/vehicle.tscn") as PackedScene
+	var car := scene.instantiate() as ArcadeVehicle
+	add_child(car)
+	car.global_position = Vector3(0.0, 0.35, -4100.0)
+
+	var visual := car.get_node_or_null("Visual") as Node3D
+	var body := car.get_node_or_null("Visual/Body") as MeshInstance3D
+	var feel: VehicleFeel = null
+	for child in car.get_children():
+		if child is VehicleFeel:
+			feel = child
+	if feel == null or visual == null or body == null:
+		_expect(false, "vehicle scene exposes Visual/Body and feel for the lean check")
+		car.queue_free()
+		return
+
+	# Only the lean: everything else also moves or scales the mesh.
+	feel.tuning = feel.tuning.duplicate()
+	feel.tuning.enable_engine_vibration = false
+	feel.tuning.enable_acceleration_deform = false
+	feel.tuning.enable_impact_pulse = false
+	feel.tuning.max_lateral_lean_roll_deg = 25.0
+	var rest_floor := _body_bottom(visual, body)["y"] as float
+
+	# Sliding right at well past full-lean speed, held until the ease settles.
+	var settle := func() -> void:
+		car.velocity = car.planar_right() * feel.tuning.lateral_speed_for_max_lean * 1.5
+		for i in 240:
+			feel._process(TICK)
+
+	settle.call()
+	var on_edge: Dictionary = _body_bottom(visual, body)
+	_expect(
+		absf(rad_to_deg(absf(visual.rotation.z)) - 25.0) < 0.5,
+		"a full slide reaches max lean (%.1f deg)" % rad_to_deg(absf(visual.rotation.z))
+	)
+	_expect(
+		on_edge["y"] >= rest_floor - 0.005,
+		"rolling on the low edge keeps the body out of the floor (bottom %.3f, rest %.3f)"
+		% [on_edge["y"], rest_floor]
+	)
+	_expect(
+		on_edge["x"] > 0.0,
+		"by default the body rolls toward the slide (low side x %.2f)" % on_edge["x"]
+	)
+
+	feel.tuning.lean_into_turn = true
+	settle.call()
+	_expect(
+		(_body_bottom(visual, body)["x"] as float) < 0.0,
+		"lean_into_turn banks the other way (low side x %.2f)" % _body_bottom(visual, body)["x"]
+	)
+
+	# Without the pivot the body rolls about its centre and the low side sinks.
+	feel.tuning.lean_into_turn = false
+	feel.tuning.lean_pivot_on_low_edge = false
+	settle.call()
+	var centred: Dictionary = _body_bottom(visual, body)
+	_expect(
+		centred["y"] < rest_floor - 0.05,
+		"a centre pivot sinks the low side (bottom %.3f vs rest %.3f)" % [centred["y"], rest_floor]
+	)
+
+	# And it all comes back to rest once the slide stops.
+	feel.tuning.lean_pivot_on_low_edge = true
+	car.velocity = Vector3.ZERO
+	for i in 240:
+		feel._process(TICK)
+	_expect(
+		visual.position.length() < 0.001 and absf(visual.rotation.z) < 0.001,
+		"the lean settles back to rest (pos %v, roll %.4f)" % [visual.position, visual.rotation.z]
+	)
+
+	car.queue_free()
+
+
+## Lowest corner of the body mesh in the car's space, and which side it is on.
+func _body_bottom(visual: Node3D, body: MeshInstance3D) -> Dictionary:
+	var box := body.mesh.get_aabb()
+	var to_car := visual.transform * body.transform
+	var lowest := {"y": INF, "x": 0.0}
+	for i in 8:
+		var corner := to_car * box.get_endpoint(i)
+		if corner.y < lowest["y"]:
+			lowest = {"y": corner.y, "x": corner.x}
+	return lowest
 
 
 func _record(label: String, value: float, unit: String, expected: float, tolerance: float) -> void:

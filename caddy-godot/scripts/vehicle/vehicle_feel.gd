@@ -38,6 +38,11 @@ var _impact_local_dir := Vector3.ZERO
 var _dash_elapsed := -1.0
 var _dash_strength := 0.0
 
+## Half the mesh width and its lowest point, in visual_root's space. The lean
+## pivots on the bottom edge these describe.
+var _lean_half_width := 0.0
+var _lean_floor_y := 0.0
+
 var _engine_phase := 0.0
 var _previous_forward_speed := 0.0
 ## Sampled once per frame from the change in forward speed.
@@ -64,7 +69,28 @@ func _ready() -> void:
 	if skill != null:
 		skill.dash_started.connect(_on_dash_started)
 
+	# Measured before the outlines exist; their grown shells would widen it.
+	_measure_lean_pivot()
 	_build_outlines()
+
+
+## Bounds of the meshes as authored, so the pivot follows the car's real size
+## rather than a number that goes stale when the body is resized.
+func _measure_lean_pivot() -> void:
+	if visual_root == null:
+		return
+	var bounds := AABB()
+	var found := false
+	for child in visual_root.get_children():
+		var mesh_instance := child as MeshInstance3D
+		if mesh_instance == null or mesh_instance.mesh == null:
+			continue
+		var box := mesh_instance.transform * mesh_instance.mesh.get_aabb()
+		bounds = box if not found else bounds.merge(box)
+		found = true
+	if found:
+		_lean_half_width = maxf(absf(bounds.position.x), absf(bounds.end.x))
+		_lean_floor_y = bounds.position.y
 
 
 ## Inverted-hull outline: a copy of each mesh with front faces culled and the
@@ -179,7 +205,10 @@ func _process(delta: float) -> void:
 	rotation_offset += _impact_rotation()
 	scale_offset += _dash_scale(delta)
 
-	visual_root.scale = _base_scale + scale_offset
+	var final_scale := _base_scale + scale_offset
+	position_offset += _lean_pivot_offset(_current_rotation_offset.z, final_scale)
+
+	visual_root.scale = final_scale
 	visual_root.position = _base_position + position_offset
 	visual_root.rotation = rotation_offset
 
@@ -219,7 +248,21 @@ func _lateral_lean() -> float:
 		vehicle.get_lateral_speed() / maxf(0.01, tuning.lateral_speed_for_max_lean), -1.0, 1.0
 	)
 	var eased := signf(lateral_alpha) * Easing.in_out_cubic(absf(lateral_alpha))
-	return deg_to_rad(-eased * tuning.max_lateral_lean_roll_deg)
+	var direction := -1.0 if tuning.lean_into_turn else 1.0
+	return deg_to_rad(-eased * tuning.max_lateral_lean_roll_deg * direction)
+
+
+## Rotation applies about visual_root's origin, the body's centre. Shifting by
+## p - R*p, where p is the bottom edge on the side going down, keeps that edge
+## where it was, so the body rolls on it instead of sinking through the floor.
+## The pivot changes side as the roll changes sign, but at zero roll both sides
+## give zero offset, so the switch is seamless.
+func _lean_pivot_offset(roll: float, scale: Vector3) -> Vector3:
+	if not tuning.lean_pivot_on_low_edge or is_zero_approx(roll) or _lean_half_width <= 0.0:
+		return Vector3.ZERO
+	# A positive roll about Z lifts +X, so the -X edge is the one going down.
+	var pivot := Vector3(-signf(roll) * _lean_half_width, _lean_floor_y, 0.0) * scale
+	return pivot - pivot.rotated(Vector3.BACK, roll)
 
 
 ## Idle shake, expressed only as scale. Rises with speed and throttle.

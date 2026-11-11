@@ -25,6 +25,13 @@ extends Resource
 @export var lateral_speed_for_max_lean: float = 10.0
 ## UE MaxLateralLeanRollDeg 7, exaggerated.
 @export var max_lateral_lean_roll_deg: float = 16.0
+## Roll about the bottom edge on the low side, the way a body rolls on its
+## suspension, instead of about the body's centre. Off, the low side dips
+## through the floor once the angle gets large.
+@export var lean_pivot_on_low_edge: bool = true
+## Off: the body rolls toward the slide, away from the turn, like a car's body
+## roll. On: it banks into the turn instead, like a bike.
+@export var lean_into_turn: bool = false
 
 @export_group("Impact pulse")
 ## UE bEnableImpactPulse.

@@ -16,6 +16,11 @@ var _log: PackedStringArray = []
 
 func _ready() -> void:
 	Engine.physics_ticks_per_second = 60
+	# Hit stop slows the engine for a stretch of real, wall-clock time, so how
+	# many slowed ticks a run gets varies from run to run and the later hits
+	# drift by a fraction of a m/s. It is cosmetic and order-blind; off here so
+	# any difference left is down to player number alone.
+	HitStop.enabled = false
 	await get_tree().physics_frame
 	# name, A start, A yaw, B start, B yaw, A throttle, B throttle
 	var scenarios := [
